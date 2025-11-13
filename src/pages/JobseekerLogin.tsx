@@ -56,7 +56,7 @@ function JobseekerLogin() {
       login('jobseeker')
       
       alert(response.message || '로그인에 성공했습니다!')
-      navigate('/jobseeker/my-page')
+      navigate('/jobseeker/search')
     } catch (error) {
       console.error('로그인 실패:', error)
       alert(getErrorMessage(error))
@@ -130,7 +130,7 @@ function JobseekerLogin() {
           type="button"
           onClick={() => {
             login('jobseeker')
-            navigate('/jobseeker/my-page')
+            navigate('/jobseeker/search')
           }}
           style={{
             width: '100%',

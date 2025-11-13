@@ -26,6 +26,9 @@ function JobPosting() {
 
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [showCalendar, setShowCalendar] = useState(false)
+  const [selectedRegion, setSelectedRegion] = useState('서울')
+  const [selectedDistrict, setSelectedDistrict] = useState('전체')
+  const [selectedDong, setSelectedDong] = useState('전체')
 
   const jobCategories = [
     '기획.전략',
@@ -50,6 +53,41 @@ function JobPosting() {
     '금융.보험',
     '공공.복지'
   ]
+
+  // 시/도 및 구/군 데이터
+  const regions: Record<string, string[]> = {
+    '서울': ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'],
+    '부산': ['강서구', '금정구', '기장군', '남구', '동구', '동래구', '부산진구', '북구', '사상구', '사하구', '서구', '수영구', '연제구', '영도구', '중구', '해운대구'],
+    '대구': ['남구', '달서구', '달성군', '동구', '북구', '서구', '수성구', '중구'],
+    '인천': ['강화군', '계양구', '미추홀구', '남동구', '동구', '부평구', '서구', '연수구', '옹진군', '중구'],
+    '광주': ['광산구', '남구', '동구', '북구', '서구'],
+    '대전': ['대덕구', '동구', '서구', '유성구', '중구'],
+    '울산': ['남구', '동구', '북구', '울주군', '중구'],
+    '세종': ['세종시'],
+    '경기': ['가평군', '고양시', '과천시', '광명시', '광주시', '구리시', '군포시', '김포시', '남양주시', '동두천시', '부천시', '성남시', '수원시', '시흥시', '안산시', '안성시', '안양시', '양주시', '양평군', '여주시', '연천군', '오산시', '용인시', '의왕시', '의정부시', '이천시', '파주시', '평택시', '포천시', '하남시', '화성시'],
+    '강원': ['강릉시', '고성군', '동해시', '삼척시', '속초시', '양구군', '양양군', '영월군', '원주시', '인제군', '정선군', '철원군', '춘천시', '태백시', '평창군', '홍천군', '화천군', '횡성군'],
+    '충북': ['괴산군', '단양군', '보은군', '영동군', '옥천군', '음성군', '제천시', '증평군', '진천군', '청주시', '충주시'],
+    '충남': ['계룡시', '공주시', '금산군', '논산시', '당진시', '보령시', '부여군', '서산시', '서천군', '아산시', '예산군', '천안시', '청양군', '태안군', '홍성군'],
+    '전북': ['고창군', '군산시', '김제시', '남원시', '무주군', '부안군', '순창군', '완주군', '익산시', '임실군', '장수군', '전주시', '정읍시', '진안군'],
+    '전남': ['강진군', '고흥군', '곡성군', '광양시', '구례군', '나주시', '담양군', '목포시', '무안군', '보성군', '순천시', '신안군', '여수시', '영광군', '영암군', '완도군', '장성군', '장흥군', '진도군', '함평군', '해남군', '화순군'],
+    '경북': ['경산시', '경주시', '고령군', '구미시', '군위군', '김천시', '문경시', '봉화군', '상주시', '성주군', '안동시', '영덕군', '영양군', '영주시', '영천시', '예천군', '울릉군', '울진군', '의성군', '청도군', '청송군', '칠곡군', '포항시'],
+    '경남': ['거제시', '거창군', '고성군', '김해시', '남해군', '밀양시', '사천시', '산청군', '양산시', '의령군', '진주시', '진해시', '창녕군', '창원시', '통영시', '하동군', '함안군', '함양군', '합천군'],
+    '제주': ['서귀포시', '제주시']
+  }
+
+  // 구/군별 동 데이터 (주요 구만 포함)
+  const districts: Record<string, string[]> = {
+    '서울 강남구': ['역삼동', '개포동', '논현동', '대치동', '도곡동', '삼성동', '세곡동', '수서동', '신사동', '압구정동', '일원동', '청담동'],
+    '서울 송파구': ['가락동', '거여동', '마천동', '문정동', '방이동', '삼전동', '석촌동', '송파동', '신천동', '오금동', '잠실동', '장지동', '풍납동'],
+    '서울 강서구': ['가양동', '공항동', '등촌동', '방화동', '염창동', '화곡동'],
+    '경기 성남시': ['금광동', '단대동', '복정동', '산성동', '수진동', '신촌동', '야탑동', '양지동', '은행동', '이매동', '정자동', '판교동', '하대원동', '하산운동'],
+    '경기 수원시': ['고등동', '곡반정동', '구운동', '권선동', '금곡동', '기산동', '매교동', '매산동', '매탄동', '영동', '영통동', '원천동', '이의동', '인계동', '장안동', '정자동', '조원동', '천천동', '팔달동', '하동', '호매실동']
+  }
+
+  const getDistricts = (region: string, district: string): string[] => {
+    const key = `${region} ${district}`
+    return districts[key] || []
+  }
 
   const requirementOptions = [
     '통장사본',
@@ -159,6 +197,36 @@ function JobPosting() {
 
   const nextMonth = () => {
     setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
+  }
+
+  // 지역 변경 핸들러
+  const handleRegionChange = (region: string) => {
+    setSelectedRegion(region)
+    setSelectedDistrict('')
+    setSelectedDong('')
+    setFormData({
+      ...formData,
+      location: region
+    })
+  }
+
+  const handleDistrictChange = (district: string) => {
+    setSelectedDistrict(district)
+    setSelectedDong('')
+    const location = `${selectedRegion} ${district}`
+    setFormData({
+      ...formData,
+      location: location
+    })
+  }
+
+  const handleDongChange = (dong: string) => {
+    setSelectedDong(dong)
+    const location = `${selectedRegion} ${selectedDistrict} ${dong}`
+    setFormData({
+      ...formData,
+      location: location
+    })
   }
 
   const handleRequirementChange = (requirement: string) => {
@@ -359,7 +427,7 @@ function JobPosting() {
                 <option value="">직업 카테고리를 선택하세요</option>
                 {jobCategories.map((category) => (
                   <option key={category} value={category}>
-                    {category}
+                    {category.replace(/\./g, '·')}
                   </option>
                 ))}
               </select>
@@ -391,21 +459,70 @@ function JobPosting() {
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
                 위치 <span style={{ color: '#f44336' }}>*</span>
               </label>
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                placeholder="예: 서울, 강남구"
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  fontSize: '16px'
-                }}
-              />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                {/* 시/도 선택 */}
+                <select
+                  value={selectedRegion}
+                  onChange={(e) => handleRegionChange(e.target.value)}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    backgroundColor: '#fff',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="">시/도 선택</option>
+                  {Object.keys(regions).map((region) => (
+                    <option key={region} value={region}>{region}</option>
+                  ))}
+                </select>
+
+                {/* 구/군 선택 */}
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => handleDistrictChange(e.target.value)}
+                  disabled={!selectedRegion}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    backgroundColor: selectedRegion ? '#fff' : '#f5f5f5',
+                    cursor: selectedRegion ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  <option value="">구/군 선택</option>
+                  {selectedRegion && regions[selectedRegion]?.map((district) => (
+                    <option key={district} value={district}>{district}</option>
+                  ))}
+                </select>
+
+                {/* 동 선택 (선택사항) */}
+                <select
+                  value={selectedDong}
+                  onChange={(e) => handleDongChange(e.target.value)}
+                  disabled={!selectedDistrict || getDistricts(selectedRegion, selectedDistrict).length === 0}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    backgroundColor: selectedDistrict && getDistricts(selectedRegion, selectedDistrict).length > 0 ? '#fff' : '#f5f5f5',
+                    cursor: selectedDistrict && getDistricts(selectedRegion, selectedDistrict).length > 0 ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  <option value="">동 선택 (선택사항)</option>
+                  {selectedDistrict && getDistricts(selectedRegion, selectedDistrict).map((dong) => (
+                    <option key={dong} value={dong}>{dong}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 

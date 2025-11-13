@@ -2,10 +2,10 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { User, Search, Briefcase, MessageCircle, Settings } from 'lucide-react'
 
 const menuItems = [
-  { path: '/jobseeker/my-page', icon: User, label: '마이페이지' },
   { path: '/jobseeker/search', icon: Search, label: '채용 검색' },
   { path: '/jobseeker/recommendations', icon: Briefcase, label: '추천 채용' },
   { path: '/jobseeker/chatbot', icon: MessageCircle, label: '챗봇' },
+  { path: '/jobseeker/my-page', icon: User, label: '프로필' },
   { path: '/jobseeker/settings', icon: Settings, label: '설정' },
 ]
 

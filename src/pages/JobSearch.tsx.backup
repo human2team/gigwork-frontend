@@ -44,7 +44,6 @@ const jobCategories = [
 
 // 시/도 데이터
 const regions: Record<string, string[]> = {
-  '전체': [],
   '서울': ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'],
   '부산': ['강서구', '금정구', '기장군', '남구', '동구', '동래구', '부산진구', '북구', '사상구', '사하구', '서구', '수영구', '연제구', '영도구', '중구', '해운대구'],
   '대구': ['남구', '달서구', '달성군', '동구', '북구', '서구', '수성구', '중구'],
@@ -71,7 +70,7 @@ function JobSearch() {
   const [jobs, setJobs] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'job' | 'location' | 'search'>('job')
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [selectedRegion, setSelectedRegion] = useState<string>('전체')
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([])
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
   const [categorySearchQuery, setCategorySearchQuery] = useState('')
   const [locationSearchQuery, setLocationSearchQuery] = useState('')
@@ -157,20 +156,15 @@ function JobSearch() {
       job.description.toLowerCase().includes(searchQuery.toLowerCase())
     
     let matchesLocation = true
-    if (selectedRegion !== '전체' || selectedDistricts.length > 0) {
+    if (selectedRegions.length > 0 || selectedDistricts.length > 0) {
       if (selectedDistricts.length > 0) {
         matchesLocation = selectedDistricts.some(district => job.location.includes(district))
-      } else if (selectedRegion !== '전체') {
-        matchesLocation = job.location.includes(selectedRegion)
+      } else {
+        matchesLocation = selectedRegions.some(region => job.location.includes(region))
       }
     }
     
-    // 카테고리 매칭 시 · 와 . 을 동일하게 처리
-    const matchesCategory = selectedCategories.length === 0 || selectedCategories.some(selectedCat => {
-      const normalizedSelected = selectedCat.replace(/·/g, '.').toLowerCase()
-      const normalizedJob = (job.category || '').replace(/·/g, '.').toLowerCase()
-      return normalizedSelected === normalizedJob
-    })
+    const matchesCategory = selectedCategories.length === 0 || selectedCategories.includes(job.category)
     
     return matchesSearch && matchesLocation && matchesCategory
   })
@@ -326,10 +320,10 @@ function JobSearch() {
               }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '14px', color: '#666' }}>선택: {selectedRegion !== '전체' ? (selectedDistricts.length > 0 ? `${selectedRegion} (${selectedDistricts.length}개 구/군)` : selectedRegion) : '전체'}</span>
+              <span style={{ fontSize: '14px', color: '#666' }}>선택: {selectedRegions.length + selectedDistricts.length}개</span>
               <button
                 onClick={() => {
-                  setSelectedRegion('전체')
+                  setSelectedRegions([])
                   setSelectedDistricts([])
                 }}
                 style={{
@@ -354,18 +348,21 @@ function JobSearch() {
                     <button
                       key={region}
                       onClick={() => {
-                        setSelectedRegion(region)
-                        setSelectedDistricts([])
+                        if (selectedRegions.includes(region)) {
+                          setSelectedRegions(selectedRegions.filter(r => r !== region))
+                        } else {
+                          setSelectedRegions([...selectedRegions, region])
+                        }
                       }}
                       style={{
                         padding: '8px 12px',
                         border: 'none',
-                        backgroundColor: selectedRegion === region ? '#e3f2fd' : 'transparent',
+                        backgroundColor: selectedRegions.includes(region) ? '#e3f2fd' : 'transparent',
                         textAlign: 'left',
                         cursor: 'pointer',
                         fontSize: '13px',
-                        color: selectedRegion === region ? '#2196f3' : '#333',
-                        fontWeight: selectedRegion === region ? 'bold' : 'normal',
+                        color: selectedRegions.includes(region) ? '#2196f3' : '#333',
+                        fontWeight: selectedRegions.includes(region) ? 'bold' : 'normal',
                         borderRadius: '4px',
                         transition: 'all 0.2s'
                       }}
@@ -378,15 +375,16 @@ function JobSearch() {
               {/* 구/군 목록 */}
               <div style={{ flex: 1 }}>
                 <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: '#333' }}>구/군</h3>
-                {selectedRegion === '전체' || !regions[selectedRegion] || regions[selectedRegion].length === 0 ? (
+                {selectedRegions.length === 0 ? (
                   <p style={{ fontSize: '13px', color: '#999', padding: '20px', textAlign: 'center' }}>
-                    {selectedRegion === '전체' ? '시/도를 먼저 선택하세요' : '선택 가능한 구/군이 없습니다'}
+                    시/도를 먼저 선택하세요
                   </p>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
-                    {regions[selectedRegion]?.map((district) => (
+                    {selectedRegions.map(region => 
+                      regions[region]?.map((district) => (
                         <label
-                          key={`${selectedRegion}-${district}`}
+                          key={`${region}-${district}`}
                           style={{
                             display: 'flex',
                             alignItems: 'center',
@@ -415,7 +413,8 @@ function JobSearch() {
                             {district}
                           </span>
                         </label>
-                      ))}
+                      ))
+                    )}
                   </div>
                 )}
               </div>

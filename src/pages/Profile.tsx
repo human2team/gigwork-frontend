@@ -876,7 +876,7 @@ function Profile() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '32px' }}>마이페이지</h1>
+      <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '32px' }}>프로필</h1>
       
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', borderBottom: '1px solid #e0e0e0' }}>
         {tabs.map((tab) => {

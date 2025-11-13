@@ -175,7 +175,7 @@ function JobManagement() {
                         fontSize: '14px',
                         fontWeight: '500'
                       }}>
-                        {job.category}
+                        {job.category.replace(/\./g, '·')}
                       </span>
                     </>
                   )}
