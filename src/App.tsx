@@ -22,6 +22,7 @@ import EmployerSettings from './pages/EmployerSettings'
 import JobseekerSettings from './pages/JobseekerSettings'
 import JobseekerLayout from './components/JobseekerLayout'
 import EmployerLayout from './components/EmployerLayout'
+import CandidateDetail from './pages/CandidateDetail'
 
 function App() {
   return (
@@ -62,6 +63,7 @@ function App() {
         <Route path="applications" element={<Applications />} />
         <Route path="applications/:id" element={<ApplicationDetail />} />
         <Route path="candidates" element={<CandidateSearch />} />
+        <Route path="candidates/:id" element={<CandidateDetail />} />
         <Route path="settings" element={<EmployerSettings />} />
       </Route>
     </Routes>

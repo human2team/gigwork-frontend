@@ -1,64 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, User, MapPin, Briefcase, Award, MessageSquare, Star } from 'lucide-react'
-
-const candidates = [
-  {
-    id: 1,
-    name: '김민수',
-    age: 28,
-    location: '서울, 강남구',
-    licenses: ['운전면허증', '포크레인 면허'],
-    experience: ['물류직원 - 2년', '창고 관리 - 1년'],
-    suitability: 95,
-    skills: ['물류', '창고 관리', '포크레인 운전'],
-    available: true
-  },
-  {
-    id: 2,
-    name: '이영희',
-    age: 25,
-    location: '서울, 서초구',
-    licenses: ['운전면허증'],
-    experience: ['데이터 입력 - 1년', '사무직 - 6개월'],
-    suitability: 88,
-    skills: ['데이터 입력', '엑셀', '워드'],
-    available: true
-  },
-  {
-    id: 3,
-    name: '박준호',
-    age: 30,
-    location: '경기, 성남시',
-    licenses: ['운전면허증'],
-    experience: ['마케팅 - 3년', '소셜 미디어 관리 - 2년'],
-    suitability: 82,
-    skills: ['마케팅', 'SNS 관리', '콘텐츠 제작'],
-    available: false
-  },
-  {
-    id: 4,
-    name: '정수진',
-    age: 24,
-    location: '서울, 마포구',
-    licenses: ['바리스타 자격증'],
-    experience: ['카페 바리스타 - 2년'],
-    suitability: 90,
-    skills: ['바리스타', '고객 서비스', 'POS 시스템'],
-    available: true
-  },
-  {
-    id: 5,
-    name: '최동현',
-    age: 27,
-    location: '인천, 연수구',
-    licenses: ['운전면허증'],
-    experience: ['포장 작업 - 3년', '물류 배송 - 1년'],
-    suitability: 85,
-    skills: ['포장', '배송', '물류'],
-    available: true
-  }
-]
+import { Search, User, MapPin, Briefcase, Award, MessageSquare } from 'lucide-react'
 
 function CandidateSearch() {
   const navigate = useNavigate()
@@ -66,6 +8,31 @@ function CandidateSearch() {
   const [locationFilter, setLocationFilter] = useState('전체')
   const [licenseFilter, setLicenseFilter] = useState('전체')
   const [minSuitability, setMinSuitability] = useState(0)
+  const [candidates, setCandidates] = useState<any[]>([])
+
+  useEffect(() => {
+    // API 호출로 후보자 목록을 불러옴
+    const fetchCandidates = async () => {
+      try {
+        const params = new URLSearchParams()
+        if (searchQuery) params.append('search', searchQuery)
+        if (locationFilter !== '전체') params.append('location', locationFilter)
+        if (licenseFilter !== '전체') params.append('license', licenseFilter)
+        if (minSuitability > 0) params.append('minSuitability', String(minSuitability))
+        const response = await fetch(`/api/candidates?${params.toString()}`)
+        if (response.ok) {
+          const data = await response.json()
+          setCandidates(data)
+        } else {
+          setCandidates([])
+        }
+      } catch (e) {
+        setCandidates([])
+      }
+    }
+    fetchCandidates()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, locationFilter, licenseFilter, minSuitability])
 
   const getSuitabilityColor = (score: number) => {
     if (score >= 85) return '#4caf50'
@@ -74,11 +41,10 @@ function CandidateSearch() {
   }
 
   const filteredCandidates = candidates.filter(candidate => {
-    const matchesSearch = candidate.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         candidate.skills.some(skill => skill.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                         candidate.experience.some(exp => exp.toLowerCase().includes(searchQuery.toLowerCase()))
-    const matchesLocation = locationFilter === '전체' || candidate.location.includes(locationFilter)
-    const matchesLicense = licenseFilter === '전체' || candidate.licenses.some(license => license.includes(licenseFilter))
+    const matchesSearch = candidate.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         candidate.experience?.some((exp: string) => exp.toLowerCase().includes(searchQuery.toLowerCase()))
+    const matchesLocation = locationFilter === '전체' || candidate.location?.includes(locationFilter)
+    const matchesLicense = licenseFilter === '전체' || candidate.licenses?.some((license: string) => license.includes(licenseFilter))
     const matchesSuitability = candidate.suitability >= minSuitability
     return matchesSearch && matchesLocation && matchesLicense && matchesSuitability
   })
@@ -275,26 +241,6 @@ function CandidateSearch() {
                   <li key={index} style={{ marginBottom: '4px' }}>{exp}</li>
                 ))}
               </ul>
-            </div>
-
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ fontSize: '14px', fontWeight: '600', marginBottom: '8px' }}>보유 기술</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                {candidate.skills.map((skill, index) => (
-                  <span
-                    key={index}
-                    style={{
-                      padding: '4px 10px',
-                      backgroundColor: '#f5f5f5',
-                      color: '#666',
-                      borderRadius: '12px',
-                      fontSize: '12px'
-                    }}
-                  >
-                    {skill}
-                  </span>
-                ))}
-              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '8px', marginTop: 'auto' }}>
