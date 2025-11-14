@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Award, Briefcase, Activity, Plus, X, Save, Edit2, Trash2, RotateCcw, Bookmark, MapPin, DollarSign, ArrowRight, CheckCircle, ChevronDown, GraduationCap, Mail, Phone, Calendar, Home, Users, Star, MessageSquare } from 'lucide-react'
-import { apiCall, getErrorMessage } from '../utils/api'
+import { apiCall, getErrorMessage, getApiBaseUrl } from '../utils/api'
 
 type ProfileTab = 'personal' | 'licenses' | 'experience' | 'physical' | 'saved' | 'applied'
 
@@ -256,7 +256,7 @@ function Profile() {
         console.log('userId:', localStorage.getItem('userId'))
         console.log('에러 상세:', error)
         
-        alert(`프로필을 불러오는데 실패했습니다.\n\n상세 오류: ${errorMessage}\n\n백엔드 서버(http://localhost:8080)가 실행 중인지 확인해주세요.`)
+        alert(`프로필을 불러오는데 실패했습니다.\n\n상세 오류: ${errorMessage}\n\n백엔드 서버(${getApiBaseUrl()})가 실행 중인지 확인해주세요.`)
       } finally {
         setIsLoadingProfile(false)
       }

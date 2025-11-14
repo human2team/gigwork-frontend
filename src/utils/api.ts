@@ -1,5 +1,41 @@
 // API 호출 래퍼 함수 및 에러 처리 유틸리티
 
+/**
+ * API 기본 URL 가져오기
+ * 환경 변수에서 VITE_API_BASE_URL을 읽거나 기본값 사용
+ */
+export function getApiBaseUrl(): string {
+  const envValue = import.meta.env.VITE_API_BASE_URL
+  const baseUrl = (envValue && envValue.trim() !== '') ? envValue.trim() : 'http://localhost:8080'
+  return baseUrl
+}
+
+/**
+ * API URL 생성
+ * 절대 URL이면 그대로 반환하고, 상대 URL이면 기본 URL과 결합
+ * 개발 환경에서는 프록시를 사용하도록 상대 경로를 반환
+ */
+export function createApiUrl(path: string): string {
+  // 이미 전체 URL이면 그대로 반환
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path
+  }
+  
+  // 개발 환경(MODE === 'development')에서는 프록시 사용을 위해 상대 경로 반환
+  const isDevelopment = import.meta.env.DEV || import.meta.env.MODE === 'development'
+  const useProxy = import.meta.env.VITE_USE_PROXY !== 'false' // 기본값: true (프록시 사용)
+  
+  if (isDevelopment && useProxy) {
+    // 개발 환경: Vite 프록시 사용 (상대 경로)
+    return path.startsWith('/') ? path : `/${path}`
+  }
+  
+  // 프로덕션 환경 또는 프록시 미사용: 절대 URL 생성
+  const baseUrl = getApiBaseUrl()
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${baseUrl}${normalizedPath}`
+}
+
 export interface ApiError extends Error {
   status?: number
   statusText?: string
@@ -32,8 +68,11 @@ export async function apiCall<T>(
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
+  // 환경 변수에서 API URL 가져오기
+  const apiUrl = createApiUrl(url)
+
   try {
-    const response = await fetch(url, {
+    const response = await fetch(apiUrl, {
       ...options,
       signal: controller.signal
     })
