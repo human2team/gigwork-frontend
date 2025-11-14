@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { User, Award, Briefcase, Activity, Plus, X, Save, Edit2, Trash2, RotateCcw, Bookmark, MapPin, DollarSign, ArrowRight, CheckCircle, ChevronDown, GraduationCap } from 'lucide-react'
+import { User, Award, Briefcase, Activity, Plus, X, Save, Edit2, Trash2, RotateCcw, Bookmark, MapPin, DollarSign, ArrowRight, CheckCircle, ChevronDown, GraduationCap, Mail, Phone, Calendar, Home, Users, Star, MessageSquare } from 'lucide-react'
 import { apiCall, getErrorMessage } from '../utils/api'
 
 type ProfileTab = 'personal' | 'licenses' | 'experience' | 'physical' | 'saved' | 'applied'
@@ -553,6 +553,8 @@ function Profile() {
   }
 
   // 개인정보 저장
+  const [personalInfoSaved, setPersonalInfoSaved] = useState(false)
+
   const handleSavePersonalInfo = async () => {
     if (!personalInfo.name || !personalInfo.email || !personalInfo.phone || !personalInfo.birthDate) {
       alert('이름, 이메일, 전화번호, 생년월일은 필수 입력 항목입니다.')
@@ -624,8 +626,9 @@ function Profile() {
       
       // 저장된 정보 업데이트
       setSavedPersonalInfo({ ...personalInfo })
+      setPersonalInfoSaved(true)
+      setTimeout(() => setPersonalInfoSaved(false), 3000)
       
-      alert('개인정보가 저장되었습니다.')
     } catch (error) {
       console.error('개인정보 저장 실패:', error)
       alert(getErrorMessage(error))
@@ -876,6 +879,26 @@ function Profile() {
 
   return (
     <div>
+      {/* 저장 성공 토스트 메시지 */}
+      {personalInfoSaved && (
+        <div style={{
+          position: 'fixed',
+          top: 80,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#2196f3',
+          color: '#fff',
+          padding: '12px 32px',
+          borderRadius: '8px',
+          fontSize: '16px',
+          fontWeight: 600,
+          zIndex: 1000,
+          boxShadow: '0 2px 8px rgba(33,150,243,0.15)'
+        }}>
+          개인정보가 저장되었습니다.
+        </div>
+      )}
+
       <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '32px' }}>프로필</h1>
       
       <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', borderBottom: '1px solid #e0e0e0' }}>
@@ -912,76 +935,112 @@ function Profile() {
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxWidth: '800px' }}>
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>이름</label>
+              <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <User size={16} color="#2196f3" />
+                이름
+              </label>
               <input
                 type="text"
                 value={personalInfo.name}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, name: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '12px 12px 12px 40px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '6px',
-                  fontSize: '16px'
+                  fontSize: '16px',
+                  backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%232196f3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>')`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: '12px center',
+                  backgroundSize: '20px 20px'
                 }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>이메일</label>
+              <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Mail size={16} color="#4caf50" />
+                이메일
+              </label>
               <input
                 type="email"
                 value={personalInfo.email}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, email: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '12px 12px 12px 40px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '6px',
-                  fontSize: '16px'
+                  fontSize: '16px',
+                  backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%234caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>')`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: '12px center',
+                  backgroundSize: '20px 20px'
                 }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>전화번호</label>
+              <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Phone size={16} color="#ff9800" />
+                전화번호
+              </label>
               <input
                 type="tel"
                 value={personalInfo.phone}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, phone: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '12px 12px 12px 40px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '6px',
-                  fontSize: '16px'
+                  fontSize: '16px',
+                  backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23ff9800" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>')`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: '12px center',
+                  backgroundSize: '20px 20px'
                 }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>생년월일</label>
+              <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Calendar size={16} color="#9c27b0" />
+                생년월일
+              </label>
               <input
                 type="date"
                 value={personalInfo.birthDate}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, birthDate: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '12px 12px 12px 40px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '6px',
-                  fontSize: '16px'
+                  fontSize: '16px',
+                  backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%239c27b0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>')`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: '12px center',
+                  backgroundSize: '20px 20px'
                 }}
               />
             </div>
             <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>성별</label>
+              <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Users size={16} color="#00bcd4" />
+                성별
+              </label>
               <select
                 value={personalInfo.gender}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, gender: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '12px 12px 12px 40px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '6px',
-                  fontSize: '16px'
+                  fontSize: '16px',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '20px 20px, 16px 16px',
+                  appearance: 'none',
+                  backgroundPosition: '12px center, right 12px center',
+                  backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%2300bcd4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>'), url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%23666" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>')`
                 }}
               >
                 <option value="">선택하세요</option>
@@ -990,17 +1049,24 @@ function Profile() {
               </select>
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>주소</label>
+              <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Home size={16} color="#607d8b" />
+                주소
+              </label>
               <input
                 type="text"
                 value={personalInfo.address}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, address: e.target.value })}
                 style={{
                   width: '100%',
-                  padding: '12px',
+                  padding: '12px 12px 12px 40px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '6px',
-                  fontSize: '16px'
+                  fontSize: '16px',
+                  backgroundImage: `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="%23607d8b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>')`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: '12px center',
+                  backgroundSize: '20px 20px'
                 }}
               />
             </div>
@@ -1038,7 +1104,10 @@ function Profile() {
 
           {/* 희망근무조건 */}
           <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e0e0e0' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>희망근무조건</h3>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Briefcase size={20} color="#2196f3" />
+              희망근무조건
+            </h3>
             <div style={{ marginBottom: '24px' }}>
               <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>지역선택</h4>
               <div style={{ display: 'flex', gap: '12px', maxWidth: '800px' }}>
@@ -1376,7 +1445,10 @@ function Profile() {
 
           {/* 나의 강점 */}
           <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e0e0e0' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>나의 강점</h3>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Star size={20} color="#ff9800" />
+              나의 강점
+            </h3>
             <p style={{ color: '#666', marginBottom: '16px', fontSize: '14px' }}>나의 강점을 최대 3개까지 선택해주세요. ({personalInfo.strengths.length}/3)</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px', maxWidth: '800px' }}>
               {strengthOptions.map((strength) => (
@@ -1442,7 +1514,10 @@ function Profile() {
 
           {/* 자기소개 */}
           <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e0e0e0' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>자기소개</h3>
+            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <MessageSquare size={20} color="#4caf50" />
+              자기소개
+            </h3>
             <div style={{ maxWidth: '800px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
                 자기소개를 입력해 주세요. (최소 20자 필수, 최대 1000자)
@@ -2612,6 +2687,26 @@ function Profile() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* 상단에 저장 성공 메시지 */}
+      {personalInfoSaved && (
+        <div style={{
+          position: 'fixed',
+          top: 80,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: '#2196f3',
+          color: '#fff',
+          padding: '12px 32px',
+          borderRadius: '8px',
+          fontSize: '16px',
+          fontWeight: 600,
+          zIndex: 1000,
+          boxShadow: '0 2px 8px rgba(33,150,243,0.15)'
+        }}>
+          개인정보가 저장되었습니다.
         </div>
       )}
     </div>

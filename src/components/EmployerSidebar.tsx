@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { Briefcase, FileText, Users, Settings } from 'lucide-react'
 
@@ -11,14 +12,21 @@ const menuItems = [
 function EmployerSidebar() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [isExpanded, setIsExpanded] = useState(false)
 
   return (
-    <aside style={{
-      width: '240px',
-      backgroundColor: '#f5f5f5',
-      padding: '24px',
-      borderRight: '1px solid #e0e0e0'
-    }}>
+    <aside 
+      onMouseEnter={() => setIsExpanded(true)}
+      onMouseLeave={() => setIsExpanded(false)}
+      style={{
+        width: isExpanded ? '240px' : '72px',
+        backgroundColor: '#f5f5f5',
+        padding: '24px 12px',
+        borderRight: '1px solid #e0e0e0',
+        transition: 'width 0.3s ease',
+        overflow: 'hidden'
+      }}
+    >
       <nav>
         {menuItems.map((item) => {
           const Icon = item.icon
@@ -40,11 +48,13 @@ function EmployerSidebar() {
                 color: isActive ? '#2196f3' : '#333',
                 cursor: 'pointer',
                 fontSize: '16px',
-                textAlign: 'left'
+                textAlign: 'left',
+                whiteSpace: 'nowrap',
+                justifyContent: isExpanded ? 'flex-start' : 'center'
               }}
             >
               <Icon size={20} />
-              <span>{item.label}</span>
+              {isExpanded && <span>{item.label}</span>}
             </button>
           )
         })}
