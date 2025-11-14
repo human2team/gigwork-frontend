@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
+import { apiCall, getErrorMessage } from '../utils/api'
 
 export interface Application {
   id: number
@@ -117,14 +118,15 @@ export function ApplicationProvider({ children }: { children: ReactNode }) {
           // ApplicationContext는 jobTitle을 직접 조회하지 않고, Applications 컴포넌트에서 전달받음
           let jobTitle = ''
           
-          const response = await fetch(`/api/jobseeker/applications/job/${jobFilter}`)
+          const applicants = await apiCall<any[]>(`/api/jobseeker/applications/job/${jobFilter}`, {
+            method: 'GET'
+          })
           
-          if (response.ok) {
-            const applicants = await response.json()
+          if (applicants && Array.isArray(applicants)) {
             console.log('✅ Applicants fetched:', applicants)
             
             // ApplicantResponse -> Application 형식 변환
-            const convertedApplications = applicants.map((applicant: any) => ({
+            const convertedApplications: Application[] = applicants.map((applicant: any) => ({
               id: applicant.applicationId,
               applicantName: applicant.name,
               jobTitle: jobTitle, // 조회한 공고 제목 사용
@@ -132,7 +134,7 @@ export function ApplicationProvider({ children }: { children: ReactNode }) {
               email: applicant.email || '',
               phone: applicant.phone || '',
               appliedDate: applicant.appliedDateFormatted || new Date(applicant.appliedDate).toLocaleDateString('ko-KR'),
-              status: applicant.status === 'PENDING' ? '대기' : applicant.status === 'ACCEPTED' ? '합격' : '불합격',
+              status: (applicant.status === 'PENDING' ? '대기' : applicant.status === 'ACCEPTED' ? '합격' : '불합격') as '대기' | '합격' | '불합격',
               suitability: applicant.suitability || 0,
               personalInfo: {
                 name: applicant.name,
@@ -175,7 +177,7 @@ export function ApplicationProvider({ children }: { children: ReactNode }) {
             
             setApplications(convertedApplications)
           } else {
-            console.error('❌ Failed to fetch applicants:', response.status)
+            console.error('❌ Failed to fetch applicants: empty response')
             setApplications([])
           }
         } else {
@@ -234,7 +236,7 @@ export function ApplicationProvider({ children }: { children: ReactNode }) {
   const updateApplicationStatus = async (id: number, status: '대기' | '합격' | '불합격') => {
     try {
       // 백엔드 API 호출
-      const response = await fetch(`http://localhost:8080/api/jobseeker/applications/${id}/status`, {
+      await apiCall(`/api/jobseeker/applications/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -242,16 +244,11 @@ export function ApplicationProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ status }),
       })
 
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || '상태 업데이트에 실패했습니다.')
-      }
-
       // 성공 시 로컬 상태도 업데이트
       updateApplication(id, { status })
     } catch (error) {
       console.error('상태 업데이트 오류:', error)
-      alert(error instanceof Error ? error.message : '상태 업데이트에 실패했습니다.')
+      alert(getErrorMessage(error))
     }
   }
 

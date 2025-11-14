@@ -63,7 +63,7 @@ function JobseekerSignup() {
         email: string
         userType: string
         message: string
-      }>('http://localhost:8080/api/auth/signup/jobseeker', {
+      }>('/api/auth/signup/jobseeker', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

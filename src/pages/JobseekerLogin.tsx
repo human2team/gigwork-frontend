@@ -21,7 +21,7 @@ function JobseekerLogin() {
         email: string
         userType: string
         message: string
-      }>('http://localhost:8080/api/auth/login', {
+      }>('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
