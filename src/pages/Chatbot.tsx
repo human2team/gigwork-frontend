@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Send, Bot, User, Trash2, MapPin, DollarSign, ArrowRight, Bookmark, BookmarkCheck } from 'lucide-react'
 import JobPreferencesCard from '../components/JobPreferencesCard'
+import axios from 'axios'
 
 interface Message {
   id: number
@@ -29,15 +30,15 @@ interface Job {
 }
 
 interface UserJobPreferences {
-  gender: string | null
-  age: number | null
-  place: string | null
-  work_days: string | null
-  start_time: string | null
-  end_time: string | null
-  hourly_wage: number | null
-  requirements: string | null
-  category: string | null
+    gender: string | null
+    age: number | null
+    place: string | null
+    work_days: string | null
+    start_time: string | null
+    end_time: string | null
+    hourly_wage: number | null
+    requirements: string | null
+    category: string | null
 }
 
 function Chatbot() {
@@ -71,15 +72,15 @@ function Chatbot() {
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const [userPreferences, setUserPreferences] = useState<UserJobPreferences>({
-    gender: null,
-    age: null,
-    place: null,
-    work_days: null,
-    start_time: null,
-    end_time: null,
-    hourly_wage: null,
-    requirements: null,
-    category: null
+      gender: null,
+      age: null,
+      place: null,
+      work_days: null,
+      start_time: null,
+      end_time: null,
+      hourly_wage: null,
+      requirements: null,
+      category: null
   })
   const [searchResults, setSearchResults] = useState<Job[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -144,10 +145,10 @@ function Chatbot() {
     // })
     // const data = await response.json()
 
-    // 임시 응답 시뮬레이션 (실제 구현 시 제거)
-    setTimeout(() => {
+    setTimeout(async () => {
       setIsTyping(false)
-      const { text, action, preferences } = generateBotResponse(currentInput)
+      //const { text, action, preferences } = generateBotResponse(currentInput)
+      const { text, action, preferences } = await generateBotResp(currentInput, userPreferences)
       
       // AI가 추출한 사용자 선호도 업데이트
       if (preferences) {
@@ -165,8 +166,45 @@ function Chatbot() {
         action: action
       }
       setMessages(prev => [...prev, botMessage])
-    }, 800)
+    }, 10)
   }
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  const generateBotResp = async (userInput: string, userPref: UserJobPreferences): Promise<{ 
+    text: string; 
+    action?: { label: string; path: string }; 
+    preferences?: Partial<UserJobPreferences> 
+  }> => {
+    try {
+      const res = await axios.post('http://localhost:8080/chat', {
+        text: userInput, //"나이는 27세. 성별은 남자. 시급은 10000원임", 전국 어느 지역이든 상관이 없습니다만 서울 지역이 1순위이긴 합니다.
+        condition: userPref, //search가 true일 때도 당연히 필요하고 false일 때도 fastapi에서 여기서 넘어간 조건을 기본으로 추가된 조건을 병합하므로 항상 필요한 파라미터임
+        search: false
+      })
+      const condition = res.data
+      const extractedPreferences: Partial<UserJobPreferences> = condition
+      if (Object.keys(extractedPreferences).length > 0) {
+        let confirmText = '입력하신 조건을 오른쪽 패널에 추가했습니다:\n\n'
+        if (extractedPreferences.place) confirmText += `📍 지역: ${extractedPreferences.place}\n`
+        if (extractedPreferences.category) confirmText += `💼 직종: ${extractedPreferences.category}\n`
+        if (extractedPreferences.work_days) confirmText += `📅 근무일: ${extractedPreferences.work_days}\n`
+        if (extractedPreferences.hourly_wage) confirmText += `💰 시급: ${extractedPreferences.hourly_wage.toLocaleString()}원\n`
+        if (extractedPreferences.start_time) confirmText += `⏰ 시간: ${extractedPreferences.start_time} ~ ${extractedPreferences.end_time}\n`
+        confirmText += "추가 조건이 있으시면 말씀해주세요. 없으시면 아래 '조건으로 검색' 버튼을 눌러주세요!"
+        return {
+          text: confirmText,
+          preferences: extractedPreferences
+        }
+      }
+      return { //기본 응답
+          text: '원하시는 일자리 조건을 더 구체적으로 말씀해주세요.\n\n예시:\n• "강남에서 주5일 서빙 일자리 찾아줘"\n• "시급 2만원 이상 카페 알바"\n• "주말만 가능한 배달 일자리"\n\n또는 일반적인 질문도 가능합니다:\n• 일자리 추천 받기\n• 프로필 관리 방법\n• 적합도 점수 설명'
+      }
+    } catch (ex) {
+      alert("generateBotResp: " + ex.message)
+    }   
+  }
+
+  ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   const generateBotResponse = (userInput: string): { 
     text: string
@@ -185,7 +223,7 @@ function Chatbot() {
         extractedPreferences.place = place
       }
     })
-
+    
     // 시급 추출
     const wageMatch = userInput.match(/(\d+,?\d+)\s*원/)
     if (wageMatch) {
