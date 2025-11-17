@@ -23,8 +23,9 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "dist/*"
+          source: "dist/**"
           target: "/deploy/frontend"
+          strip_components: 1
 
       - name: Restart nginx container
         uses: appleboy/ssh-action@v1.0.0
