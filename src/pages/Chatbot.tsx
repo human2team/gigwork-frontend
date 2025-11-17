@@ -136,10 +136,18 @@ function Chatbot() {
     // 타이핑 표시
     setIsTyping(true)
 
+    // const res = await axios.post('http://localhost:8000/update/', {
+    //   id: "3",
+    // })
+    // const rs = res.data
+    // debugger
+    // return
+
     setTimeout(async () => {
       setIsTyping(false)
       //const { text, action, preferences } = generateBotResponse(currentInput)
       const { text, action, preferences } = await addSearchCondition(inputText, userPreferences)
+
       if (preferences) {
         setUserPreferences(prev => ({
           ...prev,
@@ -201,9 +209,32 @@ function Chatbot() {
         condition: userPreferences, 
         search: true
       })
-      const jobs = res.data
+      
+      // res.data는 ChatResponse 객체이고, result 필드에 배열이 들어있음
+      const responseData = res.data
+      console.log('Search response:', responseData)
+      
+      // result가 배열인지 확인
+      const jobs = Array.isArray(responseData.result) ? responseData.result : 
+                   Array.isArray(responseData) ? responseData : []
+      
       debugger
-      const convertedJobs: Job[] = jobs.map((job: any) => ({
+      const convertedJobs: Job[] = jobs.map((job: any) => {
+        // qualifications를 배열로 안전하게 변환
+        let qualifications: string[] = []
+        if (Array.isArray(job.qualifications)) {
+          qualifications = job.qualifications
+        } else if (typeof job.qualifications === 'string') {
+          try {
+            // JSON 문자열일 경우 파싱
+            qualifications = JSON.parse(job.qualifications)
+          } catch {
+            // 쉼표로 구분된 문자열일 경우
+            qualifications = job.qualifications.split(',').map((q: string) => q.trim()).filter((q: string) => q)
+          }
+        }
+
+        return {
           id: job.id,
           title: job.title,
           category: job.category || '',
@@ -214,8 +245,9 @@ function Chatbot() {
           type: job.type || '',
           posted: job.postedDate || new Date().toISOString(),
           hourlyWage: job.hourlyWage,
-          qualifications: job.qualifications || []
-        }))
+          qualifications: qualifications
+        }
+      })
         setSearchResults(convertedJobs)
     } catch (ex) {
       alert("handleSearch: " + ex.message)

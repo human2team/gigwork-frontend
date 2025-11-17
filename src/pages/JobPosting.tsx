@@ -274,8 +274,9 @@ function JobPosting() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
     
+    e.preventDefault()
+
     // 필수 필드 검증
     if (!formData.title || !formData.category || !formData.company || !formData.location || !formData.description) {
       alert('모든 필수 항목을 입력해주세요.')
