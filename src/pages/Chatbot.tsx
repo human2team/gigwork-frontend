@@ -170,6 +170,7 @@ function Chatbot() {
         search: false
       })
       const condition = res.data
+      debugger
       const extractedPreferences: Partial<UserJobPreferences> = condition
       if (Object.keys(extractedPreferences).length > 0) {
         let confirmText = '입력하신 조건을 오른쪽 패널에 추가했습니다:\n\n'
