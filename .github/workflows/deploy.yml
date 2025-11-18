@@ -2,7 +2,13 @@ name: Deploy Frontend
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+    paths:
+      - "src/**"
+      - "public/**"
+      - "package.json"
+      - "vite.config.*"
 
 jobs:
   deploy:
@@ -12,12 +18,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install dependencies and build
+      - name: Create .env.production
         run: |
-          npm ci
-          npm run build
+          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env.production
+          echo "VITE_AI_BASE_URL=${{ secrets.VITE_AI_BASE_URL }}" >> .env.production
 
-      - name: Upload frontend to server
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Upload dist to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -27,7 +39,7 @@ jobs:
           target: "/deploy/frontend"
           strip_components: 1
 
-      - name: Restart nginx container
+      - name: Restart nginx
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -35,5 +47,4 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd /deploy
-            docker compose down
-            docker compose up -d
+            docker compose restart nginx
