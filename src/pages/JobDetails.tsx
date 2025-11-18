@@ -249,8 +249,26 @@ function JobDetails() {
 
   return (
     <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-      <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '24px' }}>{job.title}</h1>
-      
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px', justifyContent: 'space-between' }}>
+        <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: 0 }}>{job.title}</h1>
+        <button
+          onClick={() => navigate(-1)}
+          style={{
+            padding: '8px 20px',
+            backgroundColor: '#f5f5f5',
+            color: '#2196f3',
+            border: '1px solid #e0e0e0',
+            borderRadius: '6px',
+            fontSize: '15px',
+            fontWeight: 500,
+            cursor: 'pointer',
+            display: 'inline-block',
+            marginLeft: '20px'
+          }}
+        >
+          ← 뒤로 가기
+        </button>
+      </div>
       <div style={{ marginBottom: '24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
           <h2 style={{ fontSize: '20px', fontWeight: '600', margin: 0 }}>{job.company}</h2>
@@ -299,7 +317,9 @@ function JobDetails() {
       </div>
 
       <section style={{ marginBottom: '32px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>직무 설명</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>직무 설명</h2>
+        </div>
         <p style={{ color: '#666', lineHeight: '1.6', fontSize: '16px' }}>{job.description}</p>
       </section>
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings, Lock, Trash2, Eye, EyeOff, AlertTriangle } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import JobseekerProposals from './JobseekerProposals'
 
 function JobseekerSettings() {
   const navigate = useNavigate()
@@ -272,6 +273,15 @@ function JobseekerSettings() {
           </button>
         </form>
       </div>
+
+      {/* 신체 속성 섹션 */}
+      {/* 예시: 실제 신체 속성 UI/컴포넌트가 있다면 여기에 위치 */}
+      {/* <PhysicalAttributesSection /> */}
+
+
+      {/* 저장된 일자리/관심 목록 섹션 */}
+      {/* 예시: 실제 저장된 일자리 UI/컴포넌트가 있다면 여기에 위치 */}
+      {/* <SavedJobsSection /> */}
 
       {/* 계정 탈퇴 섹션 */}
       <div style={{

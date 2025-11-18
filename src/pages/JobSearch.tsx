@@ -105,7 +105,9 @@ function JobSearch() {
             posted: job.postedDate ? getDaysAgo(job.postedDate) : '최근',
             gender: job.gender || '무관',
             age: job.age || '무관',
-            education: job.education || '무관'
+            education: job.education || '무관',
+            status: job.status,
+            deadline: job.deadline
           }))
           
           setJobs(convertedJobs)
@@ -449,7 +451,7 @@ function JobSearch() {
         <div style={{ color: '#666', fontSize: '16px' }}>총 {filteredJobs.length}개의 일자리</div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
         {filteredJobs.length === 0 ? (
           <div style={{
             padding: '48px',
@@ -470,7 +472,11 @@ function JobSearch() {
                 padding: '24px',
                 border: '1px solid #e0e0e0',
                 borderRadius: '8px',
-                backgroundColor: '#ffffff'
+                backgroundColor: '#ffffff',
+                minWidth: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                height: '100%',
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
@@ -504,14 +510,28 @@ function JobSearch() {
                     <span>학력: <strong style={{ color: '#555' }}>{job.education}</strong></span>
                   </div>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <span style={{
-                      padding: '4px 12px',
-                      backgroundColor: '#e3f2fd',
-                      color: '#2196f3',
-                      borderRadius: '4px',
-                      fontSize: '12px'
-                    }}>{job.type}</span>
-                    <span style={{ color: '#999', fontSize: '12px' }}>{job.posted}</span>
+                    {/* 마감 상태 표시 */}
+                    {((job.status && job.status === 'CLOSED') || (job.deadline && new Date(job.deadline) < new Date())) ? (
+                      <span style={{
+                        padding: '4px 12px',
+                        backgroundColor: '#ffebee',
+                        color: '#d32f2f',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: 'bold',
+                      }}>마감</span>
+                    ) : (
+                      <>
+                        <span style={{
+                          padding: '4px 12px',
+                          backgroundColor: '#e3f2fd',
+                          color: '#2196f3',
+                          borderRadius: '4px',
+                          fontSize: '12px'
+                        }}>{job.type}</span>
+                        <span style={{ color: '#999', fontSize: '12px' }}>{job.posted}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

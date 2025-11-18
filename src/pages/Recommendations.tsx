@@ -13,6 +13,8 @@ type RecommendedJob = {
   salaryType?: string
   description: string
   suitability: number
+  status?: string
+  deadline?: string
 }
 
 function Recommendations() {
@@ -406,156 +408,193 @@ function Recommendations() {
           gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
           gap: '20px'
         }}>
-          {sortedJobs.map((job) => (
-          <div
-            key={job.id}
-            style={{
-              padding: '24px',
-              border: '1px solid #e0e0e0',
-              borderRadius: '8px',
-              backgroundColor: '#ffffff',
-              display: 'flex',
-              flexDirection: 'column',
-              transition: 'box-shadow 0.2s',
-              cursor: 'pointer'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.boxShadow = 'none'
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-              <div style={{ flex: 1 }}>
-                <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>{job.title}</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                  <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>{job.company}</p>
-                  {job.category && (
-                    <>
-                      <span style={{ color: '#e0e0e0' }}>|</span>
-                      <span style={{ 
-                        color: '#2196f3', 
-                        fontSize: '13px',
-                        fontWeight: '500'
-                      }}>
-                        {job.category.split('.').map((part, i, arr) => (
-                          <span key={i}>
-                            {part}
-                            {i < arr.length - 1 && <span style={{ margin: '0 1px' }}>·</span>}
-                          </span>
-                        ))}
-                      </span>
-                    </>
-                  )}
+          {sortedJobs.map((job) => {
+            // 마감 조건: status가 'CLOSED'이거나, deadline이 있고 오늘 날짜보다 이전이면 마감
+            let isClosed = false;
+            let debugMsg = '';
+            if (job.status && job.status.toUpperCase() === 'CLOSED') {
+              isClosed = true;
+              debugMsg = 'status CLOSED';
+            } else if (job.deadline) {
+              const deadlineDate = new Date(job.deadline);
+              const now = new Date();
+              deadlineDate.setHours(0,0,0,0);
+              now.setHours(0,0,0,0);
+              if (deadlineDate < now) {
+                isClosed = true;
+                debugMsg = 'deadline passed';
+              }
+            }
+            // 디버깅용 로그
+            console.log('[마감디버그]', job.id, job.status, job.deadline, 'isClosed:', isClosed, debugMsg);
+            return (
+                <div
+                  key={job.id}
+                  style={{
+                    padding: '24px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '8px',
+                    backgroundColor: '#ffffff',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'box-shadow 0.2s',
+                    cursor: 'pointer'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)'
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.boxShadow = 'none'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>{job.title}</h3>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                        <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>{job.company}</p>
+                        {job.category && (
+                          <>
+                            <span style={{ color: '#e0e0e0' }}>|</span>
+                            <span style={{ 
+                              color: '#2196f3', 
+                              fontSize: '13px',
+                              fontWeight: '500'
+                            }}>
+                              {job.category.split('.').map((part, i, arr) => (
+                                <span key={i}>
+                                  {part}
+                                  {i < arr.length - 1 && <span style={{ margin: '0 1px' }}>·</span>}
+                                </span>
+                              ))}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {isClosed && (
+                        <span style={{
+                          padding: '4px 12px',
+                          backgroundColor: '#ffebee',
+                          color: '#d32f2f',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          fontWeight: 'bold',
+                          marginRight: 4,
+                          letterSpacing: '1px',
+                          display: 'inline-block'
+                        }}>마감</span>
+                      )}
+                      <div 
+                        title={getSuitabilityDescription(job.suitability)}
+                        style={{
+                          padding: '6px 14px',
+                          backgroundColor: getSuitabilityColor(job.suitability),
+                          color: '#ffffff',
+                          borderRadius: '16px',
+                          fontSize: '13px',
+                          fontWeight: 'bold',
+                          whiteSpace: 'nowrap',
+                          cursor: 'help',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                        }}
+                      >
+                        {getSuitabilityLabel(job.suitability)} {job.suitability}%
+                      </div>
+                    </div>
+                  </div>
+
+              <div style={{
+                padding: '10px 12px',
+                backgroundColor: '#f0f7ff',
+                borderLeft: `4px solid ${getSuitabilityColor(job.suitability)}`,
+                borderRadius: '4px',
+                marginBottom: '12px'
+              }}>
+                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
+                  💡 {getSuitabilityDescription(job.suitability)}
                 </div>
               </div>
-              <div 
-                title={getSuitabilityDescription(job.suitability)}
-                style={{
-                  padding: '6px 14px',
-                  backgroundColor: getSuitabilityColor(job.suitability),
-                  color: '#ffffff',
-                  borderRadius: '16px',
-                  fontSize: '13px',
-                  fontWeight: 'bold',
-                  whiteSpace: 'nowrap',
-                  cursor: 'help',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                }}
-              >
-                {getSuitabilityLabel(job.suitability)} {job.suitability}%
-              </div>
-            </div>
 
-            <div style={{
-              padding: '10px 12px',
-              backgroundColor: '#f0f7ff',
-              borderLeft: `4px solid ${getSuitabilityColor(job.suitability)}`,
-              borderRadius: '4px',
-              marginBottom: '12px'
-            }}>
-              <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>
-                💡 {getSuitabilityDescription(job.suitability)}
-              </div>
-            </div>
+              <p style={{ 
+                color: '#666', 
+                fontSize: '14px', 
+                marginBottom: '16px', 
+                lineHeight: '1.6',
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden'
+              }}>
+                {job.description}
+              </p>
 
-            <p style={{ 
-              color: '#666', 
-              fontSize: '14px', 
-              marginBottom: '16px', 
-              lineHeight: '1.6',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden'
-            }}>
-              {job.description}
-            </p>
-
-            <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', fontSize: '14px', color: '#666', flexWrap: 'wrap' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <MapPin size={16} />
-                {job.location}
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <DollarSign size={16} />
-                {job.salaryType} {job.salary}
-              </span>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', marginTop: 'auto' }}>
-              <button
-                onClick={() => handleSaveJob(job.id)}
-                style={{
-                  padding: '8px 16px',
-                  border: savedJobIds.includes(job.id) ? '1px solid #2196f3' : '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  backgroundColor: savedJobIds.includes(job.id) ? '#e3f2fd' : '#ffffff',
-                  color: savedJobIds.includes(job.id) ? '#2196f3' : '#333',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  transition: 'all 0.2s'
-                }}
-              >
-                {savedJobIds.includes(job.id) ? (
-                  <>
-                    <BookmarkCheck size={16} />
-                    저장됨
-                  </>
-                ) : (
-                  <>
-                    <Bookmark size={16} />
-                    저장
-                  </>
+              <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', fontSize: '14px', color: '#666', flexWrap: 'wrap' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <MapPin size={16} />
+                  {job.location}
+                </span>
+                {!isClosed && (
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <DollarSign size={16} />
+                    {job.salaryType} {job.salary}
+                  </span>
                 )}
-              </button>
-              <button
-                onClick={() => navigate(`/jobseeker/job/${job.id}`)}
-                style={{
-                  padding: '8px 16px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  backgroundColor: '#2196f3',
-                  color: '#ffffff',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                상세보기
-                <ArrowRight size={16} />
-              </button>
+              </div>
+
+              <div style={{ display: 'flex', gap: '12px', marginTop: 'auto' }}>
+                <button
+                  onClick={() => handleSaveJob(job.id)}
+                  style={{
+                    padding: '8px 16px',
+                    border: savedJobIds.includes(job.id) ? '1px solid #2196f3' : '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    backgroundColor: savedJobIds.includes(job.id) ? '#e3f2fd' : '#ffffff',
+                    color: savedJobIds.includes(job.id) ? '#2196f3' : '#333',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  {savedJobIds.includes(job.id) ? (
+                    <>
+                      <BookmarkCheck size={16} />
+                      저장됨
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark size={16} />
+                      저장
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => navigate(`/jobseeker/job/${job.id}`)}
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    backgroundColor: '#2196f3',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  상세보기
+                  <ArrowRight size={16} />
+                </button>
+              </div>
             </div>
-          </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
+          );
+        })}
+      </div>
+    )}
+  </div>
+)
 }
 
 export default Recommendations

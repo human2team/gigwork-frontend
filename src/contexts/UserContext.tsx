@@ -108,6 +108,7 @@ const UserContext = createContext<UserContextType | undefined>(undefined)
 
 // 기본 구직자 프로필
 const defaultJobseekerProfile: JobseekerProfile = {
+  id: 2, // 실제 DB에 존재하는 구직자 id로 수정
   name: '김민준',
   email: 'minjun.kim@example.com',
   phone: '010-1234-5678',

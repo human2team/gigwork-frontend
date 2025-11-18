@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, Award, Briefcase, Activity, Plus, X, Save, Edit2, Trash2, RotateCcw, Bookmark, MapPin, DollarSign, ArrowRight, CheckCircle, ChevronDown, GraduationCap, Mail, Phone, Calendar, Home, Users, Star, MessageSquare } from 'lucide-react'
 import { apiCall, getErrorMessage, getApiBaseUrl } from '../utils/api'
+import JobseekerProposals from './JobseekerProposals'
 
-type ProfileTab = 'personal' | 'licenses' | 'experience' | 'physical' | 'saved' | 'applied'
+type ProfileTab = 'personal' | 'licenses' | 'experience' | 'physical' | 'saved' | 'applied' | 'proposals'
 
 type SavedJob = {
   id: number
@@ -874,7 +875,8 @@ function Profile() {
     { id: 'experience' as ProfileTab, label: '경력', icon: Briefcase },
     { id: 'physical' as ProfileTab, label: '신체 속성', icon: Activity },
     { id: 'saved' as ProfileTab, label: '저장된 일자리', icon: Bookmark },
-    { id: 'applied' as ProfileTab, label: '지원한 일자리', icon: CheckCircle }
+    { id: 'applied' as ProfileTab, label: '지원한 일자리', icon: CheckCircle },
+    { id: 'proposals' as ProfileTab, label: '제안받은 일자리', icon: MessageSquare }
   ]
 
   return (
@@ -2280,109 +2282,113 @@ function Profile() {
         </div>
       )}
 
+      {/* 신체속성 탭 */}
       {activeTab === 'physical' && (
-        <div>
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>신체 속성</h2>
-          <p style={{ color: '#666', marginBottom: '24px' }}>
-            근력, 키, 몸무게 등 신체 데이터를 입력하세요. AI 추천 시스템이 이 정보를 활용합니다.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxWidth: '800px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>근력</label>
-              <select
-                value={physicalData.strength}
-                onChange={(e) => setPhysicalData({ ...physicalData, strength: e.target.value as '상' | '중' | '하' })}
+        <>
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>신체 속성</h2>
+            <p style={{ color: '#666', marginBottom: '24px' }}>
+              근력, 키, 몸무게 등 신체 데이터를 입력하세요. AI 추천 시스템이 이 정보를 활용합니다.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxWidth: '800px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>근력</label>
+                <select
+                  value={physicalData.strength}
+                  onChange={(e) => setPhysicalData({ ...physicalData, strength: e.target.value as '상' | '중' | '하' })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '16px'
+                  }}
+                >
+                  <option value="상">상</option>
+                  <option value="중">중</option>
+                  <option value="하">하</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>키 (cm)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={physicalData.height}
+                  onChange={(e) => setPhysicalData({ ...physicalData, height: parseInt(e.target.value) })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '16px'
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>몸무게 (kg)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={physicalData.weight}
+                  onChange={(e) => setPhysicalData({ ...physicalData, weight: parseInt(e.target.value) })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '16px'
+                  }}
+                />
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+              <button
+                onClick={handleCancelPhysicalData}
                 style={{
-                  width: '100%',
-                  padding: '12px',
+                  padding: '12px 24px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '6px',
-                  fontSize: '16px'
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f5f5f5'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#ffffff'
                 }}
               >
-                <option value="상">상</option>
-                <option value="중">중</option>
-                <option value="하">하</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>키 (cm)</label>
-              <input
-                type="number"
-                min="0"
-                value={physicalData.height}
-                onChange={(e) => setPhysicalData({ ...physicalData, height: parseInt(e.target.value) })}
+                취소
+              </button>
+              <button
+                onClick={handleSavePhysicalData}
                 style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #e0e0e0',
+                  padding: '12px 24px',
+                  border: 'none',
                   borderRadius: '6px',
-                  fontSize: '16px'
+                  backgroundColor: '#2196f3',
+                  color: '#ffffff',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  transition: 'all 0.2s'
                 }}
-              />
-            </div>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>몸무게 (kg)</label>
-              <input
-                type="number"
-                min="0"
-                value={physicalData.weight}
-                onChange={(e) => setPhysicalData({ ...physicalData, weight: parseInt(e.target.value) })}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  fontSize: '16px'
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#1976d2'
                 }}
-              />
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2196f3'
+                }}
+              >
+                저장
+              </button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
-            <button
-              onClick={handleCancelPhysicalData}
-              style={{
-                padding: '12px 24px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                backgroundColor: '#ffffff',
-                cursor: 'pointer',
-                fontSize: '16px',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f5f5'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#ffffff'
-              }}
-            >
-              취소
-            </button>
-            <button
-              onClick={handleSavePhysicalData}
-              style={{
-                padding: '12px 24px',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: '#2196f3',
-                color: '#ffffff',
-                cursor: 'pointer',
-                fontSize: '16px',
-                fontWeight: 'bold',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#1976d2'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = '#2196f3'
-              }}
-            >
-              저장
-            </button>
-          </div>
-        </div>
+          <JobseekerProposals />
+        </>
       )}
 
       {activeTab === 'saved' && (
@@ -2546,7 +2552,6 @@ function Profile() {
           <p style={{ color: '#666', marginBottom: '24px' }}>
             지원을 완료한 일자리 목록입니다. 지원 상태를 확인하고 관리할 수 있습니다.
           </p>
-          
           {appliedJobs.length === 0 ? (
             <div style={{
               padding: '48px',
@@ -2690,6 +2695,10 @@ function Profile() {
         </div>
       )}
 
+      {activeTab === 'proposals' && (
+        <JobseekerProposals />
+      )}
+
       {/* 상단에 저장 성공 메시지 */}
       {personalInfoSaved && (
         <div style={{
@@ -2702,7 +2711,7 @@ function Profile() {
           padding: '12px 32px',
           borderRadius: '8px',
           fontSize: '16px',
-          fontWeight: 600,
+          fontWeight: '600',
           zIndex: 1000,
           boxShadow: '0 2px 8px rgba(33,150,243,0.15)'
         }}>

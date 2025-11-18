@@ -1,6 +1,6 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, X } from 'lucide-react'
+import { Briefcase, MapPin, FileText, User, Calendar, Award, ClipboardList, CheckCircle, Layers, X, ArrowLeft, Save } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function JobPosting() {
   const navigate = useNavigate()
@@ -370,7 +370,10 @@ function JobPosting() {
           <ArrowLeft size={16} />
           뒤로가기
         </button>
-        <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>일자리 공고 등록</h1>
+        <h1 style={{ fontSize: '28px', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <ClipboardList size={28} style={{ color: '#2196f3' }} />
+          일자리 공고 등록
+        </h1>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -382,7 +385,10 @@ function JobPosting() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>기본 정보</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <MapPin size={20} style={{ color: '#4caf50' }} />
+            기본 정보
+          </h2>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
             <div>
@@ -536,7 +542,10 @@ function JobPosting() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>직무 설명</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FileText size={20} style={{ color: '#ff9800' }} />
+            직무 설명
+          </h2>
           
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
@@ -570,7 +579,10 @@ function JobPosting() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>필요 자격</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Award size={20} style={{ color: '#9c27b0' }} />
+            필요 자격
+          </h2>
           
           {formData.qualifications.map((item, index) => (
             <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -633,7 +645,10 @@ function JobPosting() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>지원 자격</h2>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <User size={20} style={{ color: '#00bcd4' }} />
+            지원 자격
+          </h2>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
             <div>
@@ -730,7 +745,8 @@ function JobPosting() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CheckCircle size={20} style={{ color: '#ff9800' }} />
             구직자가 준비해야 할 준비물이나 능력이 있다면 선택해주세요! (최대 5개)
           </h2>
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>

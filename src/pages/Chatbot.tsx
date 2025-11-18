@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Send, Bot, User, Trash2, MapPin, DollarSign, ArrowRight, Bookmark, BookmarkCheck } from 'lucide-react'
 import JobPreferencesCard from '../components/JobPreferencesCard'
-
+import axios from 'axios'
 interface Message {
   id: number
   text: string
@@ -80,7 +80,12 @@ function Chatbot() {
     hourly_wage: null,
     requirements: null,
     category: null
-  })
+  });
+
+  // userPreferences 변경 시 콘솔 출력 (디버깅용)
+  useEffect(() => {
+    console.log('userPreferences 변경:', userPreferences);
+  }, [userPreferences]);
   const [searchResults, setSearchResults] = useState<Job[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [savedJobIds, setSavedJobIds] = useState<number[]>([])
@@ -120,54 +125,77 @@ function Chatbot() {
   }
 
   const handleSend = async () => {
-    if (!inputText.trim()) return
+    if (!inputText.trim()) return;
 
     const userMessage: Message = {
-      id: messages.length + 1,
+      id: Date.now(),
       text: inputText,
       sender: 'user',
       timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    const currentInput = inputText;
+    setInputText('');
+
+    setIsTyping(true);
+    // 실제 AI 호출 및 응답 처리
+    const { text, action, preferences } = await addSearchCondition(currentInput, userPreferences);
+    setIsTyping(false);
+
+    if (preferences) {
+      setUserPreferences(prev => {
+        const merged = { ...prev, ...preferences };
+        console.log('병합 후 userPreferences:', merged);
+        return merged;
+      });
     }
 
-    setMessages([...messages, userMessage])
-    const currentInput = inputText
-    setInputText('')
-
-    // 타이핑 표시
-    setIsTyping(true)
-
-    // TODO: 실제 AI API 호출로 교체
-    // const response = await fetch('/api/chatbot', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ message: currentInput, preferences: userPreferences })
-    // })
-    // const data = await response.json()
-
-    // 임시 응답 시뮬레이션 (실제 구현 시 제거)
-    setTimeout(() => {
-      setIsTyping(false)
-      const { text, action, preferences } = generateBotResponse(currentInput)
-      
-      // AI가 추출한 사용자 선호도 업데이트
-      if (preferences) {
-        setUserPreferences(prev => ({
-          ...prev,
-          ...preferences
-        }))
-      }
-
-      const botMessage: Message = {
-        id: messages.length + 2,
-        text: text,
-        sender: 'bot',
-        timestamp: new Date(),
-        action: action
-      }
-      setMessages(prev => [...prev, botMessage])
-    }, 800)
+    const botMessage: Message = {
+      id: Date.now() + 1,
+      text: text,
+      sender: 'bot',
+      timestamp: new Date(),
+      action: action
+    };
+    setMessages(prev => [...prev, botMessage]);
   }
 
+const addSearchCondition = async (userInput: string, userPref: UserJobPreferences): Promise<{ 
+    text: string; 
+    action?: { label: string; path: string }; 
+    preferences?: Partial<UserJobPreferences> 
+  }> => {
+    try {
+      const res = await axios.post('http://localhost:8080/chat', {
+        text: userInput, //"나이는 27세. 성별은 남자. 시급은 10000원임", 전국 어느 지역이든 상관이 없습니다만 서울 지역이 1순위이긴 합니다.
+        condition: userPref, //search가 true일 때도 당연히 필요하고 false일 때도 fastapi에서 여기서 넘어간 조건을 기본으로 추가된 조건을 병합하므로 항상 필요한 파라미터임
+        search: false
+      })
+      console.log('백엔드 응답:', res.data);
+      const condition = res.data
+      debugger
+      const extractedPreferences: Partial<UserJobPreferences> = condition
+      if (Object.keys(extractedPreferences).length > 0) {
+        let confirmText = '입력하신 조건을 오른쪽 패널에 추가했습니다:\n\n'
+        if (extractedPreferences.place) confirmText += `📍 지역: ${extractedPreferences.place}\n`
+        if (extractedPreferences.category) confirmText += `💼 직종: ${extractedPreferences.category}\n`
+        if (extractedPreferences.work_days) confirmText += `📅 근무일: ${extractedPreferences.work_days}\n`
+        if (extractedPreferences.hourly_wage) confirmText += `💰 시급: ${extractedPreferences.hourly_wage.toLocaleString()}원\n`
+        if (extractedPreferences.start_time) confirmText += `⏰ 시간: ${extractedPreferences.start_time} ~ ${extractedPreferences.end_time}\n`
+        confirmText += "추가 조건이 있으시면 말씀해주세요. 없으시면 아래 '조건으로 검색' 버튼을 눌러주세요!"
+        return {
+          text: confirmText,
+          preferences: extractedPreferences
+        }
+      }
+      return { //기본 응답
+          text: '원하시는 일자리 조건을 더 구체적으로 말씀해주세요.\n\n예시:\n• "강남에서 주5일 서빙 일자리 찾아줘"\n• "시급 2만원 이상 카페 알바"\n• "주말만 가능한 배달 일자리"\n\n또는 일반적인 질문도 가능합니다:\n• 일자리 추천 받기\n• 프로필 관리 방법\n• 적합도 점수 설명'
+      }
+    } catch (ex) {
+      alert("addSearchCondition: " + ex.message)
+    }   
+  }
   const generateBotResponse = (userInput: string): { 
     text: string
     action?: { label: string; path: string }
