@@ -1,5 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, MapPin, Calendar, DollarSign, Clock } from 'lucide-react'
+import { ArrowLeft, MapPin, Calendar, DollarSign, Clock, Info, ClipboardList, UserCheck, Briefcase, CheckCircle, AlarmClock, BookOpen, FileText } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 function EmployerJobView() {
@@ -205,13 +205,17 @@ function EmployerJobView() {
         </div>
 
         <section style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e0e0e0' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>직무 설명</h2>
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Info size={24} style={{ color: '#2196f3' }} /> 직무 설명
+          </h2>
           <p style={{ color: '#666', lineHeight: '1.8', fontSize: '16px', whiteSpace: 'pre-wrap' }}>{job.description}</p>
         </section>
 
         {job.qualifications && job.qualifications.length > 0 && job.qualifications[0] && (
           <section style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e0e0e0' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>자격 요건</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ClipboardList size={24} style={{ color: '#2196f3' }} /> 자격 요건
+            </h2>
             <ul style={{ listStyle: 'none', padding: 0 }}>
               {job.qualifications.map((qual: string, index: number) => (
                 qual.trim() && (
@@ -233,7 +237,9 @@ function EmployerJobView() {
         )}
 
         <section style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e0e0e0' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>지원 자격</h2>
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <UserCheck size={24} style={{ color: '#2196f3' }} /> 지원 자격
+          </h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             <div>
               <p style={{ fontSize: '14px', color: '#999', marginBottom: '4px' }}>성별</p>
@@ -252,7 +258,9 @@ function EmployerJobView() {
 
         {job.workingDays && job.workingDays.length > 0 && (
           <section style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e0e0e0' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>근무 시간</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlarmClock size={24} style={{ color: '#2196f3' }} /> 근무 시간
+            </h2>
             <div style={{ marginBottom: '12px' }}>
               <p style={{ color: '#666', fontSize: '16px', marginBottom: '8px' }}>
                 <strong>근무 날짜:</strong> {job.workingDays.length}일
@@ -284,7 +292,9 @@ function EmployerJobView() {
 
         {job.requirements && job.requirements.length > 0 && (
           <section style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e0e0e0' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>필요 준비물/능력</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <BookOpen size={24} style={{ color: '#2196f3' }} /> 필요 준비물/능력
+            </h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {job.requirements.map((req: string, index: number) => (
                 <span
@@ -319,7 +329,9 @@ function EmployerJobView() {
 
         <section style={{ marginBottom: '32px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>공고 정보</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <FileText size={24} style={{ color: '#2196f3' }} /> 공고 정보
+            </h2>
             <button
               onClick={handleStatusToggle}
               disabled={updating}

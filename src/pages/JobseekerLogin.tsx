@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useUser } from '../contexts/UserContext'
 import { apiCall, getErrorMessage } from '../utils/api'
 
 function JobseekerLogin() {
   const navigate = useNavigate()
   const { login } = useAuth()
+  const { setJobseekerProfile } = useUser()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -39,22 +41,22 @@ function JobseekerLogin() {
       localStorage.setItem('userEmail', response.email)
       localStorage.setItem('userType', response.userType)
       
-      // 구직자 프로필에서 이름 가져오기
+      // 구직자 전체 프로필 가져오기 및 저장
       try {
-        const profileResponse = await apiCall<{
-          name: string
-        }>(`/api/jobseeker/profile/${response.userId}`, {
+        const profileResponse = await apiCall(`/api/jobseeker/profile/${response.userId}`, {
           method: 'GET'
         })
+        localStorage.setItem('jobseekerProfile', JSON.stringify(profileResponse))
         localStorage.setItem('userName', profileResponse.name)
+        setJobseekerProfile(profileResponse)
       } catch (profileError) {
         console.error('프로필 로딩 실패:', profileError)
         // 프로필 로딩 실패해도 로그인은 진행
       }
-      
+
       // Context 로그인 상태 업데이트
       login('jobseeker')
-      
+
       alert(response.message || '로그인에 성공했습니다!')
       navigate('/jobseeker/search')
     } catch (error) {

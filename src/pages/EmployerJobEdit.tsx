@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Save, X } from 'lucide-react'
+import { ArrowLeft, Save, X, Briefcase, Info, FileText, CheckCircle, UserCheck, ClipboardList, Clock, DollarSign, Calendar } from 'lucide-react'
 import { apiCall } from '../utils/api'
 
 function EmployerJobEdit() {
@@ -421,7 +422,10 @@ function EmployerJobEdit() {
           <ArrowLeft size={16} />
           뒤로가기
         </button>
-        <h1 style={{ fontSize: '28px', fontWeight: 'bold' }}>일자리 공고 수정</h1>
+        <h1 style={{ display: 'flex', alignItems: 'center', fontSize: '28px', fontWeight: 'bold', gap: '10px' }}>
+          <Briefcase size={32} color="#2196f3" style={{ marginRight: '8px' }} />
+          일자리 공고 수정
+        </h1>
       </div>
 
       <form onSubmit={handleSubmit}>
@@ -433,7 +437,10 @@ function EmployerJobEdit() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>기본 정보</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', gap: '8px' }}>
+            <Info size={22} color="#2196f3" />
+            기본 정보
+          </h2>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
             <div>
@@ -585,7 +592,10 @@ function EmployerJobEdit() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>직무 설명</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', gap: '8px' }}>
+            <FileText size={22} color="#2196f3" />
+            직무 설명
+          </h2>
           
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
@@ -619,7 +629,10 @@ function EmployerJobEdit() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>필요 자격</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', gap: '8px' }}>
+            <CheckCircle size={22} color="#2196f3" />
+            필요 자격
+          </h2>
           
           {formData.qualifications.map((item, index) => (
             <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -682,7 +695,10 @@ function EmployerJobEdit() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>지원 자격</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', gap: '8px' }}>
+            <UserCheck size={22} color="#2196f3" />
+            지원 자격
+          </h2>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
             <div>
@@ -779,8 +795,9 @@ function EmployerJobEdit() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>
-            구직자가 준비해야 할 준비물이나 능력이 있다면 선택해주세요! (최대 5개)
+          <h2 style={{ display: 'flex', alignItems: 'center', fontSize: '20px', fontWeight: 'bold', marginBottom: '8px', gap: '8px' }}>
+            <ClipboardList size={22} color="#2196f3" />
+            구직자 준비물/능력 (최대 5개)
           </h2>
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '24px' }}>
             필요 없다면 "건너뛰기"를 선택하세요.
@@ -879,7 +896,10 @@ function EmployerJobEdit() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>근무 시간 설정</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', gap: '8px' }}>
+            <Clock size={22} color="#2196f3" />
+            근무 시간 설정
+          </h2>
           
           <div style={{ marginBottom: '24px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
@@ -1105,7 +1125,10 @@ function EmployerJobEdit() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>급여</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', gap: '8px' }}>
+            <DollarSign size={22} color="#2196f3" />
+            급여
+          </h2>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '20px' }}>
             <div>
@@ -1164,7 +1187,10 @@ function EmployerJobEdit() {
           borderRadius: '8px',
           border: '1px solid #e0e0e0'
         }}>
-          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '24px' }}>마감일</h2>
+          <h2 style={{ display: 'flex', alignItems: 'center', fontSize: '20px', fontWeight: 'bold', marginBottom: '24px', gap: '8px' }}>
+            <Calendar size={22} color="#2196f3" />
+            마감일
+          </h2>
           
           <div>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>

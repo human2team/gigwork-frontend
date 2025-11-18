@@ -9,7 +9,10 @@ function CandidateSearch() {
   const [licenseFilter, setLicenseFilter] = useState('전체')
   const [minSuitability, setMinSuitability] = useState(0)
   const [candidates, setCandidates] = useState<any[]>([])
-  const [proposedIds, setProposedIds] = useState<number[]>([])
+  const [proposedIds, setProposedIds] = useState<number[]>(() => {
+    const stored = localStorage.getItem('proposedIds');
+    return stored ? JSON.parse(stored) : [];
+  });
 
   useEffect(() => {
     // API 호출로 후보자 목록을 불러옴
@@ -34,17 +37,21 @@ function CandidateSearch() {
     fetchCandidates()
     // 이미 제안한 후보자 목록 불러오기 (로그인된 employerId 필요)
     const fetchProposed = async () => {
-      const employerId = localStorage.getItem('userId')
-      if (!employerId) return
+      const employerId = localStorage.getItem('userId');
+      if (!employerId) return;
       try {
-        const res = await fetch(`/api/proposals/employer/${employerId}/jobseekers`)
+        const res = await fetch(`/api/proposals/employer/${employerId}/jobseekers`);
         if (res.ok) {
-          const data = await res.json()
-          setProposedIds(data.map((p: any) => p.jobseekerId))
+          const data = await res.json();
+          setProposedIds((prev) => {
+            const ids = data.map((p: any) => p.jobseekerId);
+            localStorage.setItem('proposedIds', JSON.stringify(ids));
+            return ids;
+          });
         }
       } catch {}
-    }
-    fetchProposed()
+    };
+    fetchProposed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, locationFilter, licenseFilter, minSuitability])
 
@@ -276,55 +283,101 @@ function CandidateSearch() {
               >
                 상세 보기
               </button>
-              <button
-                disabled={proposedIds.includes(candidate.id)}
-                onClick={async () => {
-                  if (proposedIds.includes(candidate.id)) return;
-                  if (!window.confirm(`${candidate.name}님에게 채용 제안을 보내시겠습니까?`)) return;
-                  try {
-                    const employerId = localStorage.getItem('userId');
-                    const jobId = candidate.recommendedJobId || 1; // TODO: 실제 선택된/추천된 공고 ID로 대체
-                    const jobseekerId = candidate.id;
-                    console.log('[제안하기] 요청 파라미터:', { jobId, jobseekerId, employerId });
-                    const res = await fetch('/api/proposals', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                      body: `jobId=${jobId}&jobseekerId=${jobseekerId}&employerId=${employerId}`
-                    });
-                    console.log('[제안하기] API 응답:', res);
-                    if (res.ok) {
-                      setProposedIds(prev => [...prev, candidate.id]);
-                      alert('채용 제안이 성공적으로 전송되었습니다.');
-                    } else {
-                      const data = await res.json().catch(() => ({}));
-                      console.log('[제안하기] 에러 응답:', data);
-                      alert(data.error || '채용 제안 전송에 실패했습니다.');
+              {proposedIds.includes(candidate.id) ? (
+                <button
+                  onClick={async () => {
+                    if (!window.confirm(`${candidate.name}님에게 보낸 제안을 취소하시겠습니까?`)) return;
+                    try {
+                      const employerId = localStorage.getItem('userId');
+                      const jobId = candidate.recommendedJobId || 1;
+                      const jobseekerId = candidate.id;
+                      const res = await fetch(`/api/proposals?jobId=${jobId}&jobseekerId=${jobseekerId}&employerId=${employerId}`, {
+                        method: 'DELETE'
+                      });
+                      if (res.ok) {
+                        setProposedIds(prev => {
+                          const updated = prev.filter(id => id !== candidate.id);
+                          localStorage.setItem('proposedIds', JSON.stringify(updated));
+                          return updated;
+                        });
+                        alert('채용 제안이 취소되었습니다.');
+                      } else {
+                        const data = await res.json().catch(() => ({}));
+                        alert(data.error || '채용 제안 취소에 실패했습니다.');
+                      }
+                    } catch (e) {
+                      alert('채용 제안 취소에 실패했습니다.');
                     }
-                  } catch (e) {
-                    console.error('[제안하기] 네트워크/예외 에러:', e);
-                    alert('채용 제안 전송에 실패했습니다.');
-                  }
-                }}
-                style={{
-                  flex: 1,
-                  padding: '10px',
-                  border: 'none',
-                  borderRadius: '6px',
-                  backgroundColor: proposedIds.includes(candidate.id) ? '#bdbdbd' : '#2196f3',
-                  color: '#ffffff',
-                  cursor: proposedIds.includes(candidate.id) ? 'not-allowed' : 'pointer',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '4px',
-                  opacity: proposedIds.includes(candidate.id) ? 0.6 : 1
-                }}
-              >
-                <MessageSquare size={16} />
-                {proposedIds.includes(candidate.id) ? '제안 완료' : '제안하기'}
-              </button>
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    backgroundColor: '#bdbdbd',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    opacity: 1
+                  }}
+                >
+                  <MessageSquare size={16} />
+                  제안 취소
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    if (!window.confirm(`${candidate.name}님에게 채용 제안을 보내시겠습니까?`)) return;
+                    try {
+                      const employerId = localStorage.getItem('userId');
+                      const jobId = candidate.recommendedJobId || 1;
+                      const jobseekerId = candidate.id;
+                      const res = await fetch('/api/proposals', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: `jobId=${jobId}&jobseekerId=${jobseekerId}&employerId=${employerId}`
+                      });
+                      if (res.ok) {
+                        setProposedIds(prev => {
+                          const updated = [...prev, candidate.id];
+                          localStorage.setItem('proposedIds', JSON.stringify(updated));
+                          return updated;
+                        });
+                        alert('채용 제안이 성공적으로 전송되었습니다.');
+                      } else {
+                        const data = await res.json().catch(() => ({}));
+                        alert(data.error || '채용 제안 전송에 실패했습니다.');
+                      }
+                    } catch (e) {
+                      alert('채용 제안 전송에 실패했습니다.');
+                    }
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    border: 'none',
+                    borderRadius: '6px',
+                    backgroundColor: '#2196f3',
+                    color: '#ffffff',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    opacity: 1
+                  }}
+                >
+                  <MessageSquare size={16} />
+                  제안하기
+                </button>
+              )}
             </div>
           </div>
         ))}

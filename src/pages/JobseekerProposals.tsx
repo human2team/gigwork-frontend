@@ -48,7 +48,7 @@ export default function JobseekerProposals() {
       <h2 style={{ fontSize: '22px', fontWeight: 'bold', marginBottom: 16 }}>제안받은 일자리</h2>
       {loading && <div>로딩 중...</div>}
       {error && <div style={{ color: 'red' }}>에러: {error}</div>}
-      {!loading && proposals.length === 0 && <div>아직 받은 제안이 없습니다.</div>}
+      {!loading && !error && proposals.length === 0 && <div>아직 받은 제안이 없습니다.</div>}
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {proposals.map((proposal) => (
           <li

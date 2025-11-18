@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react'
+import { useUser } from '../contexts/UserContext'
+import type { JobseekerProfile } from '../contexts/UserContext'
 import { useNavigate } from 'react-router-dom'
 import { User, Award, Briefcase, Activity, Plus, X, Save, Edit2, Trash2, RotateCcw, Bookmark, MapPin, DollarSign, ArrowRight, CheckCircle, ChevronDown, GraduationCap, Mail, Phone, Calendar, Home, Users, Star, MessageSquare } from 'lucide-react'
 import { apiCall, getErrorMessage, getApiBaseUrl } from '../utils/api'
@@ -47,6 +49,7 @@ type Experience = {
 }
 
 function Profile() {
+  const { setJobseekerProfile } = useUser();
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<ProfileTab>('personal')
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([])
@@ -183,45 +186,20 @@ function Profile() {
         navigate('/login/jobseeker')
         return
       }
-      
       setIsLoadingProfile(true)
       try {
-        const response = await apiCall<{
-          id: number
-          name: string
-          email: string
-          phone: string
-          birthDate: string
-          gender: string
-          address: string
-          education: string
-          preferredRegion: string
-          preferredDistrict: string
-          preferredDong: string
-          workDuration: string
-          workDays: string
-          workTime: string
-          muscleStrength: 'HIGH' | 'MEDIUM' | 'LOW' | null
-          height: number
-          weight: number
-          strengths: string
-          mbti: string
-          introduction: string
-        }>(`/api/jobseeker/profile/${userId}`, {
-          method: 'GET'
-        })
-        
+        const response = await apiCall<JobseekerProfile>(`/api/jobseeker/profile/${userId}`, { method: 'GET' })
         // muscleStrength enum을 한글로 변환
-        let strengthKorean: '상' | '중' | '하' = '중'
-        if (response.muscleStrength === 'HIGH') strengthKorean = '상'
-        else if (response.muscleStrength === 'LOW') strengthKorean = '하'
-        
+        // muscleStrength, height, weight 등은 physicalAttributes에서 추출
+        let strengthKorean: '상' | '중' | '하' = '중';
+        if (response.physicalAttributes?.muscleStrength === '상') strengthKorean = '상';
+        else if (response.physicalAttributes?.muscleStrength === '하') strengthKorean = '하';
         const profileData = {
           name: response.name || '',
           email: response.email || '',
           phone: response.phone || '',
           birthDate: response.birthDate || '',
-          gender: response.gender || '',
+          gender: '',
           address: response.address || '',
           education: response.education || '',
           preferredRegion: response.preferredRegion || '전체',
@@ -230,41 +208,36 @@ function Profile() {
           workDuration: response.workDuration || '무관',
           workDays: response.workDays || '무관',
           workTime: response.workTime || '무관',
-          strengths: response.strengths ? response.strengths.split(',').filter((s: string) => s.trim() !== '') : [] as string[],
+          strengths: Array.isArray(response.strengths) ? response.strengths : [],
           mbti: response.mbti || '',
           introduction: response.introduction || '',
           muscleStrength: strengthKorean,
-          height: response.height || 0,
-          weight: response.weight || 0
-        }
-        
-        setPersonalInfo(profileData)
-        setSavedPersonalInfo(profileData)
-        
+          height: response.physicalAttributes?.height || 0,
+          weight: response.physicalAttributes?.weight || 0
+        };
+        setPersonalInfo(profileData);
+        setSavedPersonalInfo(profileData);
         const physicalInfo = {
           strength: strengthKorean,
-          height: response.height || 175,
-          weight: response.weight || 70
-        }
-        
-        setPhysicalData(physicalInfo)
-        setSavedPhysicalData(physicalInfo)
+          height: response.physicalAttributes?.height || 175,
+          weight: response.physicalAttributes?.weight || 70
+        };
+        setPhysicalData(physicalInfo);
+        setSavedPhysicalData(physicalInfo);
+        // UserContext에 프로필 저장 (id 등 포함)
+        setJobseekerProfile(response);
       } catch (error) {
         console.error('프로필 로딩 실패:', error)
         const errorMessage = getErrorMessage(error)
-        
-        // 더 자세한 에러 정보 표시
         console.log('userId:', localStorage.getItem('userId'))
         console.log('에러 상세:', error)
-        
         alert(`프로필을 불러오는데 실패했습니다.\n\n상세 오류: ${errorMessage}\n\n백엔드 서버(${getApiBaseUrl()})가 실행 중인지 확인해주세요.`)
       } finally {
         setIsLoadingProfile(false)
       }
     }
-    
     loadProfile()
-  }, [navigate])
+  }, [navigate, setJobseekerProfile])
 
   const [showRegionDropdown, setShowRegionDropdown] = useState(false)
   const [showDistrictDropdown, setShowDistrictDropdown] = useState(false)
@@ -2387,7 +2360,6 @@ function Profile() {
               </button>
             </div>
           </div>
-          <JobseekerProposals />
         </>
       )}
 
