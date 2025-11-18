@@ -71,6 +71,7 @@ function Chatbot() {
   })
   const [inputText, setInputText] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [actionMode, setActionMode] = useState<'add' | 'search'>('add') // '조건추가' or '조건으로 검색'
   const [userPreferences, setUserPreferences] = useState<UserJobPreferences>({
       gender: null,
       age: null,
@@ -725,11 +726,16 @@ function Chatbot() {
           backgroundColor: '#ffffff',
           display: 'flex',
           gap: '12px',
-          alignItems: 'flex-end'
+          alignItems: 'center'
         }}>
           <textarea
             value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
+            onChange={(e) => {
+              setInputText(e.target.value)
+              // 자동 높이 조절
+              e.target.style.height = 'auto'
+              e.target.style.height = Math.min(e.target.scrollHeight, 300) + 'px'
+            }}
             onKeyPress={handleKeyPress}
             placeholder="메시지를 입력하세요... (Enter: 전송, Shift+Enter: 줄바꿈)"
             style={{
@@ -740,21 +746,52 @@ function Chatbot() {
               fontSize: '16px',
               resize: 'none',
               minHeight: '48px',
-              maxHeight: '120px',
-              fontFamily: 'inherit'
+              maxHeight: '300px',
+              fontFamily: 'inherit',
+              overflow: 'hidden'
             }}
             rows={1}
           />
+          
+          {/* 라디오 버튼 */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px'
+          }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '14px', whiteSpace: 'nowrap' }}>
+              <input
+                type="radio"
+                name="actionMode"
+                value="add"
+                checked={actionMode === 'add'}
+                onChange={() => setActionMode('add')}
+                style={{ cursor: 'pointer' }}
+              />
+              조건 추가
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '14px', whiteSpace: 'nowrap' }}>
+              <input
+                type="radio"
+                name="actionMode"
+                value="search"
+                checked={actionMode === 'search'}
+                onChange={() => setActionMode('search')}
+                style={{ cursor: 'pointer' }}
+              />
+              {messages.length > 1 && inputText.trim() ? '채팅으로 검색' : '조건으로 검색'}
+            </label>
+          </div>
+          
           <button
-            onClick={handleSend}
-            disabled={!inputText.trim()}
+            onClick={actionMode === 'add' ? handleSend : handleSearch}
             style={{
               padding: '12px 24px',
-              backgroundColor: inputText.trim() ? '#2196f3' : '#e0e0e0',
-              color: inputText.trim() ? '#ffffff' : '#999',
+              backgroundColor: '#2196f3',
+              color: '#ffffff',
               border: 'none',
               borderRadius: '8px',
-              cursor: inputText.trim() ? 'pointer' : 'not-allowed',
+              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -763,9 +800,12 @@ function Chatbot() {
             }}
           >
             <Send size={20} />
-            전송
+            {actionMode === 'add' 
+              ? '조건 추가' 
+              : (messages.length > 1 && inputText.trim() ? '채팅으로 검색' : '조건으로 검색')
+            }
           </button>
-          {Object.values(userPreferences).some(val => val !== null) && (
+          {/* {Object.values(userPreferences).some(val => val !== null) && (
             <button
               onClick={handleSearch}
               style={{
@@ -797,7 +837,7 @@ function Chatbot() {
             >
               🔍 조건으로 검색
             </button>
-          )}
+          )} */}
         </div>
       </div>
 
