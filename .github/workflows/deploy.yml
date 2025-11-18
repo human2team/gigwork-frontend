@@ -17,16 +17,17 @@ jobs:
           npm ci
           npm run build
 
-      - name: Upload build output to server
+      - name: Upload frontend to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          source: "dist/*"
-          target: "/deploy/frontend-dist"
+          source: "dist/**"
+          target: "/deploy/frontend"
+          strip_components: 1
 
-      - name: Restart Docker containers
+      - name: Restart nginx container
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -35,5 +36,4 @@ jobs:
           script: |
             cd /deploy
             docker compose down
-            docker compose build gigwork-frontend
             docker compose up -d
