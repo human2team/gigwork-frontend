@@ -196,6 +196,61 @@ const addSearchCondition = async (userInput: string, userPref: UserJobPreference
       alert("addSearchCondition: " + ex.message)
     }   
   }
+
+  const handleSearch = async () => {
+    setIsSearching(true)
+    try {
+      const res = await axios.post('http://localhost:8080/chat', {
+        text: inputText,
+        condition: userPreferences, 
+        search: true
+      })
+      
+      // res.data는 ChatResponse 객체이고, result 필드에 배열이 들어있음
+      const responseData = res.data
+      console.log('Search response:', responseData)
+      
+      // result가 배열인지 확인
+      const jobs = Array.isArray(responseData.result) ? responseData.result : 
+                   Array.isArray(responseData) ? responseData : []
+      
+      const convertedJobs: Job[] = jobs.map((job: any) => {
+        // qualifications를 배열로 안전하게 변환
+        let qualifications: string[] = []
+        if (Array.isArray(job.qualifications)) {
+          qualifications = job.qualifications
+        } else if (typeof job.qualifications === 'string') {
+          try {
+            // JSON 문자열일 경우 파싱
+            qualifications = JSON.parse(job.qualifications)
+          } catch {
+            // 쉼표로 구분된 문자열일 경우
+            qualifications = job.qualifications.split(',').map((q: string) => q.trim()).filter((q: string) => q)
+          }
+        }
+
+        return {
+          id: job.id,
+          title: job.title,
+          category: job.category || '',
+          company: job.company || '',
+          location: job.location || '',
+          salary: job.salary || `${job.hourlyWage?.toLocaleString()}원/시간`,
+          description: job.description || '',
+          type: job.type || '',
+          posted: job.postedDate || new Date().toISOString(),
+          hourlyWage: job.hourlyWage,
+          qualifications: qualifications
+        }
+      })
+        setSearchResults(convertedJobs)
+    } catch (ex) {
+      alert("handleSearch: " + ex.message)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
   const generateBotResponse = (userInput: string): { 
     text: string
     action?: { label: string; path: string }
@@ -354,54 +409,54 @@ const addSearchCondition = async (userInput: string, userPref: UserJobPreference
     }
   }
 
-  const handleSearch = async () => {
-    setIsSearching(true)
-    try {
-      const response = await fetch('/api/jobs/active')
-      if (response.ok) {
-        let jobs = await response.json()
+  // const handleSearch = async () => {
+  //   setIsSearching(true)
+  //   try {
+  //     const response = await fetch('/api/jobs/active')
+  //     if (response.ok) {
+  //       let jobs = await response.json()
         
-        // 필터 적용
-        if (userPreferences.place) {
-          jobs = jobs.filter((job: any) => 
-            job.location?.includes(userPreferences.place!)
-          )
-        }
-        if (userPreferences.category) {
-          jobs = jobs.filter((job: any) => 
-            job.category?.includes(userPreferences.category!)
-          )
-        }
-        if (userPreferences.hourly_wage) {
-          jobs = jobs.filter((job: any) => {
-            const wage = job.hourlyWage || parseInt(job.salary?.replace(/[^0-9]/g, '') || '0')
-            return wage >= userPreferences.hourly_wage!
-          })
-        }
+  //       // 필터 적용
+  //       if (userPreferences.place) {
+  //         jobs = jobs.filter((job: any) => 
+  //           job.location?.includes(userPreferences.place!)
+  //         )
+  //       }
+  //       if (userPreferences.category) {
+  //         jobs = jobs.filter((job: any) => 
+  //           job.category?.includes(userPreferences.category!)
+  //         )
+  //       }
+  //       if (userPreferences.hourly_wage) {
+  //         jobs = jobs.filter((job: any) => {
+  //           const wage = job.hourlyWage || parseInt(job.salary?.replace(/[^0-9]/g, '') || '0')
+  //           return wage >= userPreferences.hourly_wage!
+  //         })
+  //       }
         
-        // 결과 변환
-        const convertedJobs: Job[] = jobs.map((job: any) => ({
-          id: job.id,
-          title: job.title,
-          category: job.category || '',
-          company: job.company || '',
-          location: job.location || '',
-          salary: job.salary || `${job.hourlyWage?.toLocaleString()}원/시간`,
-          description: job.description || '',
-          type: job.type || '',
-          posted: job.postedDate || new Date().toISOString(),
-          hourlyWage: job.hourlyWage,
-          qualifications: job.qualifications || []
-        }))
+  //       // 결과 변환
+  //       const convertedJobs: Job[] = jobs.map((job: any) => ({
+  //         id: job.id,
+  //         title: job.title,
+  //         category: job.category || '',
+  //         company: job.company || '',
+  //         location: job.location || '',
+  //         salary: job.salary || `${job.hourlyWage?.toLocaleString()}원/시간`,
+  //         description: job.description || '',
+  //         type: job.type || '',
+  //         posted: job.postedDate || new Date().toISOString(),
+  //         hourlyWage: job.hourlyWage,
+  //         qualifications: job.qualifications || []
+  //       }))
         
-        setSearchResults(convertedJobs)
-      }
-    } catch (error) {
-      console.error('검색 오류:', error)
-    } finally {
-      setIsSearching(false)
-    }
-  }
+  //       setSearchResults(convertedJobs)
+  //     }
+  //   } catch (error) {
+  //     console.error('검색 오류:', error)
+  //   } finally {
+  //     setIsSearching(false)
+  //   }
+  // }
 
   const handleResetPreferences = () => {
     setUserPreferences({
