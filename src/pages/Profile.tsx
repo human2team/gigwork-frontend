@@ -898,7 +898,7 @@ function Profile() {
 
       <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '32px' }}>프로필</h1>
       
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', borderBottom: '1px solid #e0e0e0' }}>
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '32px', borderBottom: '1px solid #e0e0e0', overflowX: 'auto', flexWrap: 'nowrap', paddingBottom: '4px' }}>
         {tabs.map((tab) => {
           const Icon = tab.icon
           return (
@@ -914,7 +914,9 @@ function Profile() {
                 fontSize: '16px',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                gap: '8px',
+                whiteSpace: 'nowrap',
+                lineHeight: 1.2
               }}
             >
               <Icon size={18} />

@@ -21,6 +21,7 @@ function Applications() {
   } = useApplication()
   
   const [jobs, setJobs] = useState<any[]>([])
+  const userType = (localStorage.getItem('userType') || '').toUpperCase()
 
   // 사업자의 공고 목록 가져오기
   useEffect(() => {
@@ -44,6 +45,9 @@ function Applications() {
           if (jobsData.length > 0 && jobFilter === '전체') {
             console.log('📌 Setting default job filter:', jobsData[0].id)
             setJobFilter(jobsData[0].id.toString())
+          } else if (jobsData.length === 0) {
+            // 공고가 하나도 없으면 지원자 목록 표시를 막기 위해 컨텍스트 목록 비움
+            setApplications([])
           }
         }
       } catch (error) {
@@ -134,8 +138,37 @@ function Applications() {
         지원자 관리
       </h1>
 
+      {/* 접근 제어: 사업자가 아니면 안내만 표시 */}
+      {userType !== 'EMPLOYER' && (
+        <Card padding="xl" style={{ marginBottom: theme.spacing.xl }}>
+          <p style={{ 
+            fontSize: theme.typography.fontSize.base, 
+            color: theme.colors.text.secondary 
+          }}>
+            이 페이지는 사업자 전용입니다. 사업자로 로그인 후 이용해 주세요.
+          </p>
+        </Card>
+      )}
+
+      {/* 공고가 없으면 지원자 목록을 숨기고 안내 표시 */}
+      {userType === 'EMPLOYER' && jobs.length === 0 && (
+        <Card padding="xl" style={{ marginBottom: theme.spacing.xl }}>
+          <p style={{ 
+            fontSize: theme.typography.fontSize.base, 
+            color: theme.colors.text.secondary 
+          }}>
+            아직 등록한 공고가 없습니다. 공고를 등록한 후 지원자 관리가 가능합니다.
+          </p>
+          <div style={{ marginTop: theme.spacing.md }}>
+            <Button variant="primary" onClick={() => navigate('/employer/jobs/posting')}>
+              공고 등록하러 가기
+            </Button>
+          </div>
+        </Card>
+      )}
+
       {/* 공고 선택 */}
-      {jobs.length > 0 && (
+      {userType === 'EMPLOYER' && jobs.length > 0 && (
         <div style={{ marginBottom: theme.spacing.xl }}>
           <label style={{ 
             display: 'block', 
@@ -167,9 +200,10 @@ function Applications() {
       )}
 
       {/* 지원자 목록 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.lg }}>
-        {filteredApplications.map((application) => (
-          <Card key={application.id} padding="xl">
+      {userType === 'EMPLOYER' && jobs.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: theme.spacing.lg }}>
+          {filteredApplications.map((application) => (
+            <Card key={application.id} padding="xl">
             <div style={{ 
               display: 'flex', 
               justifyContent: 'space-between', 
@@ -301,11 +335,12 @@ function Applications() {
                 상세 보기
               </Button>
             </div>
-          </Card>
-        ))}
-      </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {filteredApplications.length === 0 && (
+      {userType === 'EMPLOYER' && jobs.length > 0 && filteredApplications.length === 0 && (
         <Card padding="xl" style={{ textAlign: 'center' }}>
           <p style={{ 
             fontSize: theme.typography.fontSize.base, 

@@ -1,46 +1,67 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, MapPin, DollarSign, Bookmark, ArrowRight, BookmarkCheck } from 'lucide-react'
+import { Search, MapPin, DollarSign, Bookmark, ArrowRight, BookmarkCheck, ChevronDown, X } from 'lucide-react'
 import { apiCall } from '../utils/api'
 
-// 날짜 차이 계산 함수
+// 상대 시간 계산 함수 (분/시간/일/주/개월)
 const getDaysAgo = (dateString: string): string => {
-  const today = new Date()
-  const postedDate = new Date(dateString)
-  const diffTime = today.getTime() - postedDate.getTime()
-  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
-  
-  if (diffDays === 0) return '오늘'
-  if (diffDays === 1) return '1일전'
-  if (diffDays < 7) return `${diffDays}일전`
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}주전`
-  return `${Math.floor(diffDays / 30)}개월전`
+  if (!dateString) return '최근'
+  const now = new Date()
+  const d = new Date(dateString)
+  const ms = now.getTime() - d.getTime()
+  const minutes = Math.floor(ms / (1000 * 60))
+  const hours = Math.floor(ms / (1000 * 60 * 60))
+  const days = Math.floor(ms / (1000 * 60 * 60 * 24))
+  if (minutes < 1) return '방금 전'
+  if (minutes < 60) return `${minutes}분 전`
+  if (hours < 24) return `${hours}시간 전`
+  if (days < 7) return `${days}일전`
+  if (days < 30) return `${Math.floor(days / 7)}주전`
+  return `${Math.floor(days / 30)}개월전`
 }
 
-// 직업 카테고리 데이터
-const jobCategories = [
-  '기획·전략',
-  '마케팅·홍보·조사',
-  '회계·세무·재무',
-  '인사·노무·HRD',
-  '총무·법무·사무',
-  'IT개발·데이터',
-  '디자인',
-  '영업·판매·무역',
-  '고객상담·TM',
-  '구매·자재·물류',
-  '상품기획·MD',
-  '운전·운송·배송',
-  '서비스',
-  '생산',
-  '건설·건축',
-  '의료',
-  '연구·R&D',
-  '교육',
-  '미디어·문화·스포츠',
-  '금융·보험',
-  '공공·복지'
-]
+const formatNumber = (v: any) => {
+  const n = typeof v === 'string' ? parseInt(v.replace(/[^0-9]/g, '') || '0', 10) : Number(v || 0)
+  if (!Number.isFinite(n)) return ''
+  return n.toLocaleString()
+}
+
+const formatDate = (dateString?: string): string => {
+  if (!dateString) return ''
+  const d = new Date(dateString)
+  if (isNaN(d.getTime())) return ''
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// 마감 여부 계산 (상태가 CLOSED이거나, 마감일이 '오늘 이전'이면 마감)
+const isJobClosed = (status?: string, deadline?: string): boolean => {
+  if (status && String(status).toUpperCase() === 'CLOSED') return true
+  if (!deadline) return false
+  const deadlineDate = new Date(deadline)
+  if (isNaN(deadlineDate.getTime())) return false
+  const today = new Date()
+  // 날짜 단위 비교: 마감 당일은 '마감 아님'
+  deadlineDate.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+  return deadlineDate < today
+}
+
+// 마감임박: 마감일이 '오늘 00:00'인 경우
+const isDeadlineToday = (deadline?: string): boolean => {
+  if (!deadline) return false
+  const d = new Date(deadline)
+  if (isNaN(d.getTime())) return false
+  const today = new Date()
+  d.setHours(0, 0, 0, 0)
+  today.setHours(0, 0, 0, 0)
+  return d.getTime() === today.getTime()
+}
+
+// 업직종 2단 구조 - 서버에서 불러옴
+type CategoryItem = { cd: string; nm: string }
 
 // 시/도 데이터
 const regions: Record<string, string[]> = {
@@ -64,6 +85,19 @@ const regions: Record<string, string[]> = {
   '제주': ['서귀포시', '제주시']
 }
 
+// 구/군 → 동 매핑 (예시: 필요한 구만 우선 추가, 나머지는 비워둠)
+const dongsByDistrict: Record<string, string[]> = {
+  '서울 강남구': ['전체', '개포동', '논현동', '대치동', '도곡동', '삼성동', '세곡동', '수서동', '신사동', '압구정동', '일원동', '청담동'],
+  '서울 송파구': ['전체', '잠실동', '풍납동', '송파동', '가락동', '문정동', '방이동', '거여동', '마천동', '석촌동', '오금동', '장지동'],
+  '서울 서초구': ['전체', '서초동', '잠원동', '반포동', '방배동', '양재동']
+}
+
+const getDongs = (region: string, district: string): string[] => {
+  if (!region || !district) return []
+  const key = `${region} ${district}`
+  return dongsByDistrict[key] || []
+}
+
 function JobSearch() {
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
@@ -73,10 +107,74 @@ function JobSearch() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [selectedRegion, setSelectedRegion] = useState<string>('전체')
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
-  const [categorySearchQuery, setCategorySearchQuery] = useState('')
+  const [selectedDongs, setSelectedDongs] = useState<string[]>([])
+  // 새 컨트롤 바 상태
+  const [showRegionPopup, setShowRegionPopup] = useState(false)
+  const [showJobPopup, setShowJobPopup] = useState(false)
+  const [selectedJobMainCd, setSelectedJobMainCd] = useState<string>('') // 서버 카테고리 코드
+  const [selectedJobSubcats, setSelectedJobSubcats] = useState<string[]>([])
+  const [excludeBar, setExcludeBar] = useState(false)
   const [locationSearchQuery, setLocationSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const PER_PAGE = 9
+  // 서버 카테고리 상태
+  const [jobMainCats, setJobMainCats] = useState<CategoryItem[]>([])
+  const [jobSubCatsByMain, setJobSubCatsByMain] = useState<Record<string, CategoryItem[]>>({})
+  const getMainName = (cd?: string) => jobMainCats.find(m => m.cd === cd)?.nm || cd || ''
+  const getRangeForMain = (cd: string) => {
+    const letter = (cd?.match(/^[A-Za-z]/)?.[0]) || cd?.charAt(0) || 'A'
+    return { start: `${letter}01`, end: `${letter}99` }
+  }
+  const ensureLoadMainCats = async () => {
+    if (jobMainCats.length > 0) return
+    try {
+      const url = `/api/categories?kind=01&depth=1`
+      console.log('[categories] fetch main:', url)
+      const res = await fetch(url)
+      if (res.ok) {
+        const data: CategoryItem[] = await res.json()
+        console.log('[categories] main ok:', data?.length)
+        if (Array.isArray(data) && data.length > 0) {
+          setJobMainCats(data)
+          setSelectedJobMainCd(data[0].cd)
+          return
+        }
+        console.warn('[categories] main empty')
+        setJobMainCats([])
+        setSelectedJobMainCd('')
+      } else {
+        console.warn('[categories] main not ok:', res.status)
+        setJobMainCats([])
+        setSelectedJobMainCd('')
+      }
+    } catch {
+      setJobMainCats([])
+      setSelectedJobMainCd('')
+    }
+  }
+  const ensureLoadSubCats = async (mainCd: string) => {
+    if (!mainCd) return
+    if (jobSubCatsByMain[mainCd]) return
+    try {
+      // 서버에서 parent 기반으로 조회 (LIKE 'A__')
+      const url = `/api/categories?kind=01&depth=2&parent=${encodeURIComponent(mainCd)}`
+      console.log('[categories] fetch sub:', mainCd, url)
+      const res = await fetch(url)
+      if (res.ok) {
+        const data: CategoryItem[] = await res.json()
+        console.log('[categories] sub ok:', mainCd, data?.length)
+        setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: Array.isArray(data) ? data : [] }))
+      } else {
+        console.warn('[categories] sub not ok:', mainCd)
+        setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: [] }))
+      }
+    } catch {
+      console.warn('[categories] sub error:', mainCd)
+      setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: [] }))
+    }
+  }
+  // 최초 로드시 메인 카테고리 로드
+  useEffect(() => { ensureLoadMainCats() }, [])
 
   // localStorage에서 저장된 일자리 ID 목록 불러오기
   useEffect(() => {
@@ -107,6 +205,8 @@ function JobSearch() {
             company: job.company || '',
             location: job.location || '',
             salary: job.salaryType && job.salary ? `${job.salaryType} ${job.salary}` : job.salary || '협의',
+            salaryType: job.salaryType || null,
+            salaryRaw: job.salary || null,
             description: job.description || '',
             type: '파트타임',
             posted: job.postedDate ? getDaysAgo(job.postedDate) : '최근',
@@ -114,7 +214,9 @@ function JobSearch() {
             age: job.age || '무관',
             education: job.education || '무관',
             status: job.status,
-            deadline: job.deadline
+            deadline: job.deadline,
+            startTime: job.startTime,
+            endTime: job.endTime
           }))
           
           setJobs(convertedJobs)
@@ -168,18 +270,33 @@ function JobSearch() {
     let matchesLocation = true
     if (selectedRegion !== '전체' || selectedDistricts.length > 0) {
       if (selectedDistricts.length > 0) {
-        matchesLocation = selectedDistricts.some(district => job.location.includes(district))
+        // 동이 선택되어 있으면 동 기준으로, 아니면 구/군 기준으로
+        if (selectedDongs.length > 0) {
+          // '전체'가 포함되어 있으면 동 필터를 구/군 기준으로 완화
+          if (selectedDongs.includes('전체')) {
+            matchesLocation = selectedDistricts.some(district => job.location.includes(district))
+          } else {
+            matchesLocation = selectedDongs.some(dong => job.location.includes(dong))
+          }
+        } else {
+          matchesLocation = selectedDistricts.some(district => job.location.includes(district))
+        }
       } else if (selectedRegion !== '전체') {
         matchesLocation = job.location.includes(selectedRegion)
       }
     }
     
-    // 카테고리 매칭 시 · 와 . 을 동일하게 처리
-    const matchesCategory = selectedCategories.length === 0 || selectedCategories.some(selectedCat => {
+    // 카테고리 매칭: 기존 selectedCategories 또는 새 selectedJobSubcats 중 하나라도 일치
+    const baseCategoryMatch = selectedCategories.length === 0 || selectedCategories.some(selectedCat => {
       const normalizedSelected = selectedCat.replace(/·/g, '.').toLowerCase()
       const normalizedJob = (job.category || '').replace(/·/g, '.').toLowerCase()
       return normalizedSelected === normalizedJob
     })
+    const subcatMatch =
+      selectedJobSubcats.length === 0 ||
+      selectedJobSubcats.some(sub => (job.category || '').toLowerCase().includes(sub.toLowerCase()))
+    const barExcluded = excludeBar ? !((job.category || '').toLowerCase().includes('bar')) : true
+    const matchesCategory = baseCategoryMatch && subcatMatch && barExcluded
     
     return matchesSearch && matchesLocation && matchesCategory
   })
@@ -190,11 +307,6 @@ function JobSearch() {
   const startIndex = (currentSafePage - 1) * PER_PAGE
   const pageJobs = filteredJobs.slice(startIndex, startIndex + PER_PAGE)
 
-  // 필터링된 카테고리
-  const filteredCategories = jobCategories.filter(category => 
-    categorySearchQuery === '' || category.includes(categorySearchQuery)
-  )
-
   // 필터링된 지역
   const filteredRegions = Object.keys(regions).filter(region =>
     locationSearchQuery === '' || region.includes(locationSearchQuery)
@@ -202,402 +314,437 @@ function JobSearch() {
 
   return (
     <div>
-      <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '24px' }}>구직 검색</h1>
+      <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '16px' }}>전체 채용 정보</h1>
       
-      {/* 탭 메뉴 */}
-      <div style={{ display: 'flex', border: '1px solid #e0e0e0', borderRadius: '8px 8px 0 0', overflow: 'hidden', marginBottom: 0 }}>
-        <button
-          onClick={() => setActiveTab('job')}
-          style={{
-            flex: 1,
-            padding: '16px',
-            border: 'none',
-            borderRight: '1px solid #e0e0e0',
-            backgroundColor: activeTab === 'job' ? '#ffffff' : '#f5f5f5',
-            borderBottom: activeTab === 'job' ? 'none' : '1px solid #e0e0e0',
-            cursor: 'pointer',
-            fontSize: '16px',
-            fontWeight: activeTab === 'job' ? 'bold' : 'normal',
-            color: activeTab === 'job' ? '#2196f3' : '#666'
-          }}
-        >
-          직업 선택
-        </button>
-        <button
-          onClick={() => setActiveTab('location')}
-          style={{
-            flex: 1,
-            padding: '16px',
-            border: 'none',
-            borderRight: '1px solid #e0e0e0',
-            backgroundColor: activeTab === 'location' ? '#ffffff' : '#f5f5f5',
-            borderBottom: activeTab === 'location' ? 'none' : '1px solid #e0e0e0',
-            cursor: 'pointer',
-            fontSize: '16px',
-            fontWeight: activeTab === 'location' ? 'bold' : 'normal',
-            color: activeTab === 'location' ? '#2196f3' : '#666'
-          }}
-        >
-          지역 선택
-        </button>
-        <button
-          onClick={() => setActiveTab('search')}
-          style={{
-            flex: 1,
-            padding: '16px',
-            border: 'none',
-            backgroundColor: activeTab === 'search' ? '#ffffff' : '#f5f5f5',
-            borderBottom: activeTab === 'search' ? 'none' : '1px solid #e0e0e0',
-            cursor: 'pointer',
-            fontSize: '16px',
-            fontWeight: activeTab === 'search' ? 'bold' : 'normal',
-            color: activeTab === 'search' ? '#2196f3' : '#666'
-          }}
-        >
-          검색어 입력
-        </button>
-      </div>
-
-      {/* 탭 내용 */}
-      <div style={{ border: '1px solid #e0e0e0', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: '24px', marginBottom: '24px', backgroundColor: '#ffffff' }}>
-        {activeTab === 'job' && (
-          <div>
-            <input
-              type="text"
-              value={categorySearchQuery}
-              onChange={(e) => setCategorySearchQuery(e.target.value)}
-              placeholder="직업(직무) 또는 전문분야 입력"
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                fontSize: '14px',
-                marginBottom: '16px'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '14px', color: '#666' }}>선택: {selectedCategories.length}개</span>
-              <button
-                onClick={() => setSelectedCategories([])}
-                style={{
-                  padding: '6px 12px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '4px',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  color: '#666'
-                }}
-              >
-                초기화
-              </button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-              {filteredCategories.map((category) => (
+      {/* 컨트롤 바: 지역 / 업직종 / 검색어 */}
+      <div style={{
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center',
+        marginBottom: '12px',
+        flexWrap: 'wrap',
+        position: 'relative',
+        // 팝업이 열릴 때 아래 목록을 가리지 않도록 여유 공간 확보
+        paddingBottom: (showRegionPopup || showJobPopup) ? 340 : 0
+      }}>
+        {/* 지역 */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => { setShowRegionPopup(!showRegionPopup); setShowJobPopup(false) }}
+            style={{
+              padding: '10px 12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              backgroundColor: '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            지역{selectedDistricts.length > 0 || selectedDongs.length > 0 ? `(${(selectedDongs.length || selectedDistricts.length)})` : ''}
+            <ChevronDown size={16} />
+          </button>
+          {showRegionPopup && (
+          <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              left: 0,
+              width: 760,
+              backgroundColor: '#fff',
+              border: '1px solid #e0e0e0',
+              borderRadius: 8,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+              padding: 12,
+              zIndex: 10
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: '#999' }}>최대 5개까지 선택 가능</div>
                 <button
-                  key={category}
-                  onClick={() => {
-                    if (selectedCategories.includes(category)) {
-                      setSelectedCategories(selectedCategories.filter(c => c !== category))
-                    } else {
-                      setSelectedCategories([...selectedCategories, category])
-                    }
-                  }}
-                  style={{
-                    padding: '10px',
-                    border: selectedCategories.includes(category) ? '2px solid #2196f3' : '1px solid #e0e0e0',
-                    borderRadius: '6px',
-                    backgroundColor: selectedCategories.includes(category) ? '#e3f2fd' : '#ffffff',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: selectedCategories.includes(category) ? '#2196f3' : '#333',
-                    fontWeight: selectedCategories.includes(category) ? 'bold' : 'normal',
-                    transition: 'all 0.2s',
-                    textAlign: 'center'
-                  }}
+                  onClick={() => { setSelectedRegion('전체'); setSelectedDistricts([]); setSelectedDongs([]) }}
+                  style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
                 >
-                  {category}
+                  초기화
                 </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'location' && (
-          <div>
-            <input
-              type="text"
-              value={locationSearchQuery}
-              onChange={(e) => setLocationSearchQuery(e.target.value)}
-              placeholder="지역명 입력"
-              style={{
-                width: '100%',
-                padding: '12px 16px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '6px',
-                fontSize: '14px',
-                marginBottom: '16px'
-              }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <span style={{ fontSize: '14px', color: '#666' }}>선택: {selectedRegion !== '전체' ? (selectedDistricts.length > 0 ? `${selectedRegion} (${selectedDistricts.length}개 구/군)` : selectedRegion) : '전체'}</span>
-              <button
-                onClick={() => {
-                  setSelectedRegion('전체')
-                  setSelectedDistricts([])
-                }}
-                style={{
-                  padding: '6px 12px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '4px',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  color: '#666'
-                }}
-              >
-                지역 초기화
-              </button>
-            </div>
-            <div style={{ display: 'flex', gap: '16px' }}>
-              {/* 시/도 목록 */}
-              <div style={{ width: '150px', borderRight: '1px solid #e0e0e0', paddingRight: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: '#333' }}>시/도</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '400px', overflowY: 'auto' }}>
-                  {filteredRegions.map((region) => (
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 320px', gap: 12 }}>
+                {/* 시/도 */}
+                <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                  {Object.keys(regions).filter(r => r !== '전체').map(region => (
                     <button
                       key={region}
-                      onClick={() => {
-                        setSelectedRegion(region)
-                        setSelectedDistricts([])
-                      }}
+                      onClick={() => { setSelectedRegion(region); setSelectedDistricts([]); setSelectedDongs([]) }}
                       style={{
-                        padding: '8px 12px',
-                        border: 'none',
-                        backgroundColor: selectedRegion === region ? '#e3f2fd' : 'transparent',
+                        width: '100%',
                         textAlign: 'left',
-                        cursor: 'pointer',
-                        fontSize: '13px',
+                        padding: '8px 10px',
+                        border: 'none',
+                        background: selectedRegion === region ? '#e3f2fd' : 'transparent',
                         color: selectedRegion === region ? '#2196f3' : '#333',
-                        fontWeight: selectedRegion === region ? 'bold' : 'normal',
-                        borderRadius: '4px',
-                        transition: 'all 0.2s'
+                        cursor: 'pointer',
+                        borderRadius: 6
                       }}
                     >
                       {region}
                     </button>
                   ))}
                 </div>
-              </div>
-              {/* 구/군 목록 */}
-              <div style={{ flex: 1 }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '12px', color: '#333' }}>구/군</h3>
-                {selectedRegion === '전체' || !regions[selectedRegion] || regions[selectedRegion].length === 0 ? (
-                  <p style={{ fontSize: '13px', color: '#999', padding: '20px', textAlign: 'center' }}>
-                    {selectedRegion === '전체' ? '시/도를 먼저 선택하세요' : '선택 가능한 구/군이 없습니다'}
-                  </p>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
-                    {regions[selectedRegion]?.map((district) => (
-                        <label
-                          key={`${selectedRegion}-${district}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '6px 10px',
-                            cursor: 'pointer',
-                            fontSize: '13px',
-                            borderRadius: '4px',
-                            backgroundColor: selectedDistricts.includes(district) ? '#e3f2fd' : '#fafafa',
-                            border: selectedDistricts.includes(district) ? '1px solid #2196f3' : '1px solid #e0e0e0'
+                {/* 구/군 */}
+                <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                  {selectedRegion !== '전체' && regions[selectedRegion]?.map(district => {
+                    const selected = selectedDistricts.includes(district)
+                    return (
+                      <label key={district} style={{
+                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                        background: selected ? '#e3f2fd' : 'transparent', borderRadius: 6, cursor: 'pointer'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={selected}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedDistricts(prev => [...prev, district])
+                              // 해당 구 선택 시 동 초기화
+                              setSelectedDongs(prev => prev.filter(d => !getDongs(selectedRegion, district).includes(d)))
+                            } else {
+                              setSelectedDistricts(prev => prev.filter(d => d !== district))
+                              setSelectedDongs(prev => prev.filter(d => !getDongs(selectedRegion, district).includes(d)))
+                            }
                           }}
-                        >
+                        />
+                        <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333' }}>{district}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+                {/* 동 */}
+                <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                  {selectedRegion !== '전체' && selectedDistricts.length > 0 ? (
+                    <>
+                      {selectedDistricts.map(district => {
+                        const dongs = getDongs(selectedRegion, district)
+                        return (
+                          <div key={district} style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: 12, color: '#999', marginBottom: 6 }}>{district}</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
+                              {(dongs.length > 0 ? dongs : ['전체']).map(dong => {
+                                const selected = selectedDongs.includes(dong)
+                                return (
+                                  <label key={`${district}-${dong}`} style={{
+                                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
+                                    border: selected ? '1px solid #2196f3' : '1px solid #e0e0e0',
+                                    background: selected ? '#e3f2fd' : '#fff', borderRadius: 6, cursor: 'pointer'
+                                  }}>
+                                    <input
+                                      type="checkbox"
+                                      checked={selected}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedDongs(prev => prev.length >= 5 ? prev : [...prev, dong])
+                                        } else {
+                                          setSelectedDongs(prev => prev.filter(d => d !== dong))
+                                        }
+                                      }}
+                                    />
+                                    <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{dong}</span>
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </>
+                  ) : (
+                    <div style={{ fontSize: 13, color: '#999' }}>구/군을 먼저 선택하세요</div>
+                  )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                <button
+                  onClick={() => setShowRegionPopup(false)}
+                  style={{ padding: '8px 14px', border: 'none', borderRadius: 6, background: '#2196f3', color: '#fff', cursor: 'pointer' }}
+                >
+                  적용
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        {/* 업직종 */}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => { setShowJobPopup(!showJobPopup); setShowRegionPopup(false); ensureLoadMainCats(); if (selectedJobMainCd) ensureLoadSubCats(selectedJobMainCd) }}
+            style={{
+              padding: '10px 12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              backgroundColor: '#fff',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            업직종{selectedJobSubcats.length > 0 ? `(${selectedJobSubcats.length})` : ''}
+            <ChevronDown size={16} />
+          </button>
+          {showJobPopup && (
+            <div style={{
+              position: 'absolute',
+              top: 'calc(100% + 8px)',
+              left: 0,
+              width: 680,
+              backgroundColor: '#fff',
+              border: '1px solid #e0e0e0',
+              borderRadius: 8,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+              padding: 12,
+              zIndex: 10
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: '#999' }}>최대 5개까지 선택 가능</div>
+                <button
+                  onClick={() => { if (jobMainCats[0]) setSelectedJobMainCd(jobMainCats[0].cd); setSelectedJobSubcats([]); setExcludeBar(false) }}
+                  style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
+                >
+                  초기화
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 12, maxHeight: 320 }}>
+                {/* 대분류 */}
+                <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                  {jobMainCats.map(main => (
+                    <button
+                      key={main.cd}
+                      onClick={() => { setSelectedJobMainCd(main.cd); ensureLoadSubCats(main.cd) }}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                        background: selectedJobMainCd === main.cd ? '#e3f2fd' : 'transparent',
+                        color: selectedJobMainCd === main.cd ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                      }}
+                    >
+                      {main.nm}
+                    </button>
+                  ))}
+                </div>
+                {/* 소분류 */}
+                <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#555' }}>
+                      <input
+                        type="checkbox"
+                        checked={excludeBar}
+                        onChange={(e) => setExcludeBar(e.target.checked)}
+                      />
+                      바(Bar) 제외
+                    </label>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
+                    {(jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm) || []).map(sub => {
+                      const selected = selectedJobSubcats.includes(sub)
+                      return (
+                        <label key={`${selectedJobMainCd}-${sub}`} style={{
+                          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
+                          border: selected ? '1px solid #2196f3' : '1px solid #e0e0e0',
+                          background: selected ? '#e3f2fd' : '#fff', borderRadius: 6, cursor: 'pointer'
+                        }}>
                           <input
                             type="checkbox"
-                            checked={selectedDistricts.includes(district)}
+                            checked={selected}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setSelectedDistricts([...selectedDistricts, district])
+                                setSelectedJobSubcats(prev => prev.length >= 5 ? prev : [...prev, sub])
                               } else {
-                                setSelectedDistricts(selectedDistricts.filter(d => d !== district))
+                                setSelectedJobSubcats(prev => prev.filter(s => s !== sub))
                               }
                             }}
-                            style={{ width: '14px', height: '14px', cursor: 'pointer' }}
                           />
-                          <span style={{ color: selectedDistricts.includes(district) ? '#2196f3' : '#333' }}>
-                            {district}
-                          </span>
+                          <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{sub}</span>
                         </label>
-                      ))}
+                      )
+                    })}
                   </div>
-                )}
+                </div>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                <button
+                  onClick={() => setShowJobPopup(false)}
+                  style={{ padding: '8px 14px', border: 'none', borderRadius: 6, background: '#2196f3', color: '#fff', cursor: 'pointer' }}
+                >
+                  적용
+                </button>
               </div>
             </div>
-          </div>
-        )}
-
-        {activeTab === 'search' && (
-          <div>
-            <div style={{ marginBottom: '24px', position: 'relative' }}>
-              <Search size={20} style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="구직 제목, 기술 또는 회사 입력"
-                style={{
-                  width: '100%',
-                  padding: '12px 16px 12px 48px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  fontSize: '16px'
-                }}
-              />
-            </div>
-          </div>
-        )}
+          )}
+        </div>
+        {/* 검색어 */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
+          <Search size={18} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="구직 제목, 기술 또는 회사 입력"
+            style={{
+              width: '100%',
+              padding: '10px 12px 10px 36px',
+              border: '1px solid #e0e0e0',
+              borderRadius: 6,
+              fontSize: 14
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              title="지우기"
+              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer' }}
+            >
+              <X size={16} color="#999" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div style={{ color: '#666', fontSize: '16px' }}>총 {filteredJobs.length}개의 일자리</div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-        {filteredJobs.length === 0 ? (
+      {/* 테이블 스타일 목록 */}
+      {filteredJobs.length === 0 ? (
+        <div style={{
+          padding: '48px',
+          textAlign: 'center',
+          backgroundColor: '#f9f9f9',
+          borderRadius: '8px',
+          border: '1px solid #e0e0e0'
+        }}>
+          <Search size={48} color="#999" style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <p style={{ fontSize: '16px', color: '#666', marginBottom: '8px' }}>검색 결과가 없습니다</p>
+          <p style={{ fontSize: '14px', color: '#999' }}>다른 검색어나 지역을 선택해보세요.</p>
+        </div>
+      ) : (
+        <div style={{ border: '1px solid #e0e0e0', borderRadius: '8px', overflow: 'hidden', backgroundColor: '#fff' }}>
+          {/* 헤더 */}
           <div style={{
-            padding: '48px',
-            textAlign: 'center',
-            backgroundColor: '#f9f9f9',
-            borderRadius: '8px',
-            border: '1px solid #e0e0e0'
+            display: 'grid',
+            gridTemplateColumns: '40px 1.8fr 1fr 1fr 1fr 0.8fr 1fr',
+            padding: '12px 16px',
+            backgroundColor: '#fafafa',
+            borderBottom: '1px solid #e0e0e0',
+            fontSize: '14px',
+            color: '#666',
+            fontWeight: 600
           }}>
-            <Search size={48} color="#999" style={{ marginBottom: '16px', opacity: 0.5 }} />
-            <p style={{ fontSize: '16px', color: '#666', marginBottom: '8px' }}>검색 결과가 없습니다</p>
-            <p style={{ fontSize: '14px', color: '#999' }}>다른 검색어나 지역을 선택해보세요.</p>
+            <div />
+            <div>기업명 / 공고제목</div>
+            <div>근무지</div>
+            <div>근무시간</div>
+            <div>급여</div>
+            <div>등록일</div>
+            <div>마감일</div>
           </div>
-        ) : (
-          pageJobs.map((job) => (
-            <div
-              key={job.id}
-              style={{
-                padding: '24px',
-                border: '1px solid #e0e0e0',
-                borderRadius: '8px',
-                backgroundColor: '#ffffff',
-                minWidth: 0,
-                display: 'flex',
-                flexDirection: 'column',
-                height: '100%',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-                <div style={{ flex: 1 }}>
-                  <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '8px' }}>{job.title}</h3>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
-                    <p style={{ color: '#666', fontSize: '14px', margin: 0 }}>{job.company}</p>
-                    {job.category && (
-                      <>
-                        <span style={{ color: '#e0e0e0' }}>|</span>
-                        <span style={{ color: '#2196f3', fontSize: '13px', fontWeight: '500' }}>
-                          {job.category}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '14px', color: '#666' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <MapPin size={16} />
-                      {job.location}
+          {/* Rows */}
+          {pageJobs.map((job) => {
+            const isClosed = isJobClosed(job.status, job.deadline)
+            const isDueToday = isDeadlineToday(job.deadline) && !isClosed
+            const workTime = job.startTime && job.endTime ? `${job.startTime} ~ ${job.endTime}` : '시간협의'
+            const salaryBadge = job.salaryType ? job.salaryType : (job.salary || '').split(' ')[0] || ''
+            const salaryAmount = job.salaryRaw ? formatNumber(job.salaryRaw) : formatNumber((job.salary || '').replace(/[^0-9]/g, ''))
+            return (
+              <div
+                key={job.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '40px 1.8fr 1fr 1fr 1fr 0.8fr 1fr',
+                  padding: '14px 16px',
+                  borderBottom: '1px solid #f0f0f0',
+                  alignItems: 'center'
+                }}
+              >
+                {/* 즐겨찾기 */}
+                <div>
+                  <button
+                    onClick={() => handleSaveJob(job.id)}
+                    title={savedJobIds.includes(job.id) ? '저장됨' : '저장'}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      color: savedJobIds.includes(job.id) ? '#2196f3' : '#ccc',
+                      padding: 0
+                    }}
+                  >
+                    {savedJobIds.includes(job.id) ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
+                  </button>
+                </div>
+                {/* 기업/제목 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+                  <div style={{ fontSize: '13px', color: '#666' }}>{job.company}</div>
+                  <button
+                    onClick={() => navigate(`/jobseeker/job/${job.id}`)}
+                    style={{
+                      border: 'none',
+                      background: 'transparent',
+                      textAlign: 'left',
+                      padding: 0,
+                      fontSize: '15px',
+                      fontWeight: 700,
+                      color: isClosed ? '#bdbdbd' : '#222',
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis'
+                    }}
+                  >
+                    {isClosed ? '마감 공고입니다.' : job.title}
+                  </button>
+                </div>
+                {/* 근무지 */}
+                <div style={{ fontSize: '14px', color: '#555' }}>{job.location}</div>
+                {/* 근무시간 */}
+                <div style={{ fontSize: '14px', color: '#555' }}>{workTime}</div>
+                {/* 급여 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{
+                    padding: '3px 8px',
+                    backgroundColor: '#e3f2fd',
+                    color: '#2196f3',
+                    borderRadius: 4,
+                    fontSize: '12px',
+                    fontWeight: 700
+                  }}>
+                    {salaryBadge || '급여'}
+                  </span>
+                  <span style={{ fontSize: '14px', color: '#222', fontWeight: 700 }}>
+                    {salaryAmount || job.salary || '협의'}
+                  </span>
+                </div>
+                {/* 등록일 */}
+                <div style={{ fontSize: '13px', color: '#999' }}>{job.posted}</div>
+                {/* 마감일 */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '13px', color: isClosed ? '#d32f2f' : '#666', fontWeight: isClosed ? 700 as any : 400 }}>
+                    {formatDate(job.deadline) || '-'}
+                  </span>
+                  {isDueToday && (
+                    <span style={{
+                      padding: '3px 8px',
+                      backgroundColor: '#fff3e0',
+                      color: '#ef6c00',
+                      borderRadius: 4,
+                      fontSize: '12px',
+                      fontWeight: 700
+                    }}>
+                      마감 임박
                     </span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <DollarSign size={16} />
-                      {job.salary}
-                    </span>
-                  </div>
-                  <p style={{ color: '#666', fontSize: '14px', marginBottom: '12px' }}>{job.description}</p>
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '8px', fontSize: '13px', color: '#666' }}>
-                    <span>성별: <strong style={{ color: '#555' }}>{job.gender}</strong></span>
-                    <span>연령: <strong style={{ color: '#555' }}>{job.age}</strong></span>
-                    <span>학력: <strong style={{ color: '#555' }}>{job.education}</strong></span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    {/* 마감 상태 표시 */}
-                    {((job.status && job.status === 'CLOSED') || (job.deadline && new Date(job.deadline) < new Date())) ? (
-                      <span style={{
-                        padding: '4px 12px',
-                        backgroundColor: '#ffebee',
-                        color: '#d32f2f',
-                        borderRadius: '4px',
-                        fontSize: '12px',
-                        fontWeight: 'bold',
-                      }}>마감</span>
-                    ) : (
-                      <>
-                        <span style={{
-                          padding: '4px 12px',
-                          backgroundColor: '#e3f2fd',
-                          color: '#2196f3',
-                          borderRadius: '4px',
-                          fontSize: '12px'
-                        }}>{job.type}</span>
-                        <span style={{ color: '#999', fontSize: '12px' }}>{job.posted}</span>
-                      </>
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
-                <button
-                  onClick={() => handleSaveJob(job.id)}
-                  style={{
-                    padding: '8px 16px',
-                    border: savedJobIds.includes(job.id) ? '1px solid #2196f3' : '1px solid #e0e0e0',
-                    borderRadius: '6px',
-                    backgroundColor: savedJobIds.includes(job.id) ? '#e3f2fd' : '#ffffff',
-                    color: savedJobIds.includes(job.id) ? '#2196f3' : '#333',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    transition: 'all 0.2s'
-                  }}
-                >
-                  {savedJobIds.includes(job.id) ? (
-                    <>
-                      <BookmarkCheck size={16} />
-                      저장됨
-                    </>
-                  ) : (
-                    <>
-                      <Bookmark size={16} />
-                      저장
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={() => navigate(`/jobseeker/job/${job.id}`)}
-                  style={{
-                    padding: '8px 16px',
-                    border: 'none',
-                    borderRadius: '6px',
-                    backgroundColor: '#2196f3',
-                    color: '#ffffff',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
-                  }}
-                >
-                  상세보기
-                  <ArrowRight size={16} />
-                </button>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+            )
+          })}
+        </div>
+      )}
       
       {/* 페이지네이션 */}
       {filteredJobs.length > 0 && (

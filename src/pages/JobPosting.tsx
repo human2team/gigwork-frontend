@@ -1,4 +1,4 @@
-import { Briefcase, MapPin, FileText, User, Calendar, Award, ClipboardList, CheckCircle, Layers, X, ArrowLeft, Save } from 'lucide-react';
+import { Briefcase, MapPin, FileText, User, Calendar, Award, ClipboardList, CheckCircle, Layers, X, ArrowLeft, Save, ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -29,30 +29,44 @@ function JobPosting() {
   const [selectedRegion, setSelectedRegion] = useState('서울')
   const [selectedDistrict, setSelectedDistrict] = useState('전체')
   const [selectedDong, setSelectedDong] = useState('전체')
+  const [showRegionPopup, setShowRegionPopup] = useState(false)
 
-  const jobCategories = [
-    '기획.전략',
-    '마케팅.홍보.조사',
-    '회계.세무.재무',
-    '인사.노무.HRD',
-    '총무.법무.사무',
-    'IT개발.데이터',
-    '디자인',
-    '영업.판매.무역',
-    '고객상담.TM',
-    '구매.자재.물류',
-    '상품기획.MD',
-    '운전.운송.배송',
-    '서비스',
-    '생산',
-    '건설.건축',
-    '의료',
-    '연구.R&D',
-    '교육',
-    '미디어.문화.스포츠',
-    '금융.보험',
-    '공공.복지'
-  ]
+  // 카테고리(백엔드 연동)
+  type CategoryItem = { cd: string; nm: string }
+  const [jobMainCats, setJobMainCats] = useState<CategoryItem[]>([])
+  const [jobSubCatsByMain, setJobSubCatsByMain] = useState<Record<string, CategoryItem[]>>({})
+  const [selectedJobMainCd, setSelectedJobMainCd] = useState<string>('')
+  const [selectedJobSub, setSelectedJobSub] = useState<{ cd: string; nm: string } | null>(null)
+  const [showCategoryPopup, setShowCategoryPopup] = useState(false)
+
+  const ensureLoadMainCats = async () => {
+    if (jobMainCats.length > 0) return
+    try {
+      const res = await fetch(`/api/categories?kind=01&depth=1`)
+      if (res.ok) {
+        const data: CategoryItem[] = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          setJobMainCats(data)
+          setSelectedJobMainCd(data[0].cd)
+        }
+      }
+    } catch {}
+  }
+  const ensureLoadSubCats = async (mainCd: string) => {
+    if (!mainCd) return
+    if (jobSubCatsByMain[mainCd]) return
+    try {
+      const res = await fetch(`/api/categories?kind=01&depth=2&parent=${encodeURIComponent(mainCd)}`)
+      if (res.ok) {
+        const data: CategoryItem[] = await res.json()
+        setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: Array.isArray(data) ? data : [] }))
+      } else {
+        setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: [] }))
+      }
+    } catch {
+      setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: [] }))
+    }
+  }
 
   // 시/도 및 구/군 데이터
   const regions: Record<string, string[]> = {
@@ -277,7 +291,7 @@ function JobPosting() {
     e.preventDefault()
     
     // 필수 필드 검증
-    if (!formData.title || !formData.category || !formData.company || !formData.location || !formData.description) {
+    if (!formData.title || !(selectedJobSub?.nm || formData.category) || !formData.company || !formData.location || !formData.description) {
       alert('모든 필수 항목을 입력해주세요.')
       return
     }
@@ -316,9 +330,14 @@ function JobPosting() {
         },
         body: JSON.stringify({
           title: formData.title,
-          category: formData.category,
+          category: selectedJobSub?.nm || formData.category,
+          categoryCode: selectedJobSub?.cd || '',
+          categoryName: selectedJobSub?.nm || formData.category,
           company: formData.company,
           location: formData.location,
+          region: selectedRegion,
+          district: selectedDistrict,
+          dong: selectedDong,
           description: formData.description,
           qualifications: formData.qualifications.filter(q => q.trim() !== ''),
           requirements: formData.requirements,
@@ -411,32 +430,98 @@ function JobPosting() {
                 }}
               />
             </div>
-            <div>
+            <div style={{ position: 'relative' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
-                직업 선택(카테고리) <span style={{ color: '#f44336' }}>*</span>
+                직업 카테고리 <span style={{ color: '#f44336' }}>*</span>
               </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                required
+              <button
+                type="button"
+                onClick={() => { setShowCategoryPopup(!showCategoryPopup); ensureLoadMainCats(); if (selectedJobMainCd) ensureLoadSubCats(selectedJobMainCd) }}
                 style={{
                   width: '100%',
                   padding: '12px',
                   border: '1px solid #e0e0e0',
                   borderRadius: '6px',
                   fontSize: '16px',
-                  backgroundColor: '#fff',
-                  cursor: 'pointer'
+                  backgroundColor: '#ffffff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
                 }}
               >
-                <option value="">직업 카테고리를 선택하세요</option>
-                {jobCategories.map((category) => (
-                  <option key={category} value={category}>
-                    {category.replace(/\./g, '·')}
-                  </option>
-                ))}
-              </select>
+                <span>{selectedJobSub?.nm || formData.category || '카테고리 선택'}</span>
+                <ChevronDown size={18} color="#999" />
+              </button>
+              {showCategoryPopup && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  left: 0,
+                  width: 640,
+                  backgroundColor: '#fff',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: 8,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  padding: 12,
+                  zIndex: 20
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, color: '#999' }}>하위(소분류)에서 1개 선택</div>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedJobMainCd(jobMainCats[0]?.cd || ''); setSelectedJobSub(null) }}
+                      style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
+                    >
+                      초기화
+                    </button>
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 12, maxHeight: 320 }}>
+                    <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                      {jobMainCats.map(main => (
+                        <button
+                          type="button"
+                          key={main.cd}
+                          onClick={() => { setSelectedJobMainCd(main.cd); ensureLoadSubCats(main.cd) }}
+                          style={{
+                            width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                            background: selectedJobMainCd === main.cd ? '#e3f2fd' : 'transparent',
+                            color: selectedJobMainCd === main.cd ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                          }}
+                        >
+                          {main.nm}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
+                        {(jobSubCatsByMain[selectedJobMainCd] || []).map(sub => {
+                          const selected = selectedJobSub?.nm === sub.nm
+                          return (
+                            <label key={sub.cd} style={{
+                              display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
+                              border: selected ? '1px solid #2196f3' : '1px solid #e0e0e0',
+                              background: selected ? '#e3f2fd' : '#fff', borderRadius: 6, cursor: 'pointer'
+                            }}>
+                              <input
+                                type="radio"
+                                name="categorySub"
+                                checked={selected}
+                                onChange={() => {
+                                  setSelectedJobSub({ cd: sub.cd, nm: sub.nm })
+                                  setFormData(prev => ({ ...prev, category: sub.nm }))
+                                  setShowCategoryPopup(false)
+                                }}
+                              />
+                              <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{sub.nm}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -461,74 +546,131 @@ function JobPosting() {
                 }}
               />
             </div>
-            <div>
+            <div style={{ position: 'relative' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
                 위치 <span style={{ color: '#f44336' }}>*</span>
               </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
-                {/* 시/도 선택 */}
-                <select
-                  value={selectedRegion}
-                  onChange={(e) => handleRegionChange(e.target.value)}
-                  required
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowRegionPopup(!showRegionPopup) }}
                   style={{
-                    width: '100%',
                     padding: '12px',
                     border: '1px solid #e0e0e0',
                     borderRadius: '6px',
-                    fontSize: '14px',
-                    backgroundColor: '#fff',
-                    cursor: 'pointer'
+                    backgroundColor: '#ffffff',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    minWidth: 260,
+                    justifyContent: 'space-between'
                   }}
                 >
-                  <option value="">시/도 선택</option>
-                  {Object.keys(regions).map((region) => (
-                    <option key={region} value={region}>{region}</option>
-                  ))}
-                </select>
-
-                {/* 구/군 선택 */}
-                <select
-                  value={selectedDistrict}
-                  onChange={(e) => handleDistrictChange(e.target.value)}
-                  disabled={!selectedRegion}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    backgroundColor: selectedRegion ? '#fff' : '#f5f5f5',
-                    cursor: selectedRegion ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  <option value="">구/군 선택</option>
-                  {selectedRegion && regions[selectedRegion]?.map((district) => (
-                    <option key={district} value={district}>{district}</option>
-                  ))}
-                </select>
-
-                {/* 동 선택 (선택사항) */}
-                <select
-                  value={selectedDong}
-                  onChange={(e) => handleDongChange(e.target.value)}
-                  disabled={!selectedDistrict || getDistricts(selectedRegion, selectedDistrict).length === 0}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '6px',
-                    fontSize: '14px',
-                    backgroundColor: selectedDistrict && getDistricts(selectedRegion, selectedDistrict).length > 0 ? '#fff' : '#f5f5f5',
-                    cursor: selectedDistrict && getDistricts(selectedRegion, selectedDistrict).length > 0 ? 'pointer' : 'not-allowed'
-                  }}
-                >
-                  <option value="">동 선택 (선택사항)</option>
-                  {selectedDistrict && getDistricts(selectedRegion, selectedDistrict).map((dong) => (
-                    <option key={dong} value={dong}>{dong}</option>
-                  ))}
-                </select>
+                  <span>{selectedRegion ? [selectedRegion, selectedDistrict, selectedDong].filter(Boolean).join(' ') : '지역 선택'}</span>
+                  <ChevronDown size={18} color="#999" />
+                </button>
               </div>
+              {showRegionPopup && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  left: 0,
+                  width: 760,
+                  backgroundColor: '#fff',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: 8,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  padding: 12,
+                  zIndex: 20
+                }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 320px', gap: 12 }}>
+                    {/* 시/도 */}
+                    <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                      {Object.keys(regions).map((region) => (
+                        <button
+                          type="button"
+                          key={region}
+                          onClick={() => { 
+                            setSelectedRegion(region); 
+                            setSelectedDistrict(''); 
+                            setSelectedDong(''); 
+                            setFormData(prev => ({ ...prev, location: region })) 
+                          }}
+                          style={{
+                            width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                            background: selectedRegion === region ? '#e3f2fd' : 'transparent',
+                            color: selectedRegion === region ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                          }}
+                        >
+                          {region}
+                        </button>
+                      ))}
+                    </div>
+                    {/* 구/군 */}
+                    <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                      {selectedRegion && regions[selectedRegion]?.map(district => (
+                        <button
+                          type="button"
+                          key={district}
+                          onClick={() => { 
+                            setSelectedDistrict(district); 
+                            setSelectedDong(''); 
+                            setFormData(prev => ({ ...prev, location: `${selectedRegion} ${district}` })) 
+                          }}
+                          style={{
+                            width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                            background: selectedDistrict === district ? '#e3f2fd' : 'transparent',
+                            color: selectedDistrict === district ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                          }}
+                        >
+                          {district}
+                        </button>
+                      ))}
+                    </div>
+                    {/* 동 */}
+                    <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                      {selectedDistrict ? (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
+                          {(getDistricts(selectedRegion, selectedDistrict).length > 0 ? getDistricts(selectedRegion, selectedDistrict) : ['전체']).map(dong => {
+                            const selected = (selectedDong || '') === (dong === '전체' ? '' : dong)
+                            return (
+                              <label key={dong} style={{
+                                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
+                                border: selected ? '1px solid #2196f3' : '1px solid #e0e0e0',
+                                background: selected ? '#e3f2fd' : '#fff', borderRadius: 6, cursor: 'pointer'
+                              }}>
+                                <input
+                                  type="radio"
+                                  name="dong"
+                                  checked={selected}
+                                  onChange={() => { 
+                                    setSelectedDong(dong === '전체' ? '' : dong);
+                                    setFormData(prev => ({ ...prev, location: `${selectedRegion} ${selectedDistrict} ${dong === '전체' ? '' : dong}`.trim() })) 
+                                  }}
+                                />
+                                <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{dong}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: 13, color: '#999' }}>구/군을 먼저 선택하세요</div>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                    <button
+                      type="button"
+                      onClick={() => { setShowRegionPopup(false) }}
+                      style={{ padding: '8px 14px', border: 'none', borderRadius: 6, background: '#2196f3', color: '#fff', cursor: 'pointer' }}
+                    >
+                      적용
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
