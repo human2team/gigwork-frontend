@@ -55,6 +55,22 @@ function Profile() {
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([])
   const [appliedJobs, setAppliedJobs] = useState<AppliedJob[]>([])
   
+  // strengths 정규화 유틸
+  const sanitizeStrengths = (value: any): string[] => {
+    const toArray = (v: any): string[] => {
+      if (!v) return []
+      if (Array.isArray(v)) return v
+      if (typeof v === 'string') return v.split(/[,;\n\r]+/)
+      return []
+    }
+    const unique = new Set(
+      toArray(value)
+        .map((s) => (typeof s === 'string' ? s.trim() : ''))
+        .filter((s) => !!s && strengthOptions.includes(s))
+    )
+    return Array.from(unique).slice(0, 3)
+  }
+  
   // 시/도 및 구/군 데이터
   const regions: Record<string, string[]> = {
     '전체': ['전체'],
@@ -194,12 +210,13 @@ function Profile() {
         let strengthKorean: '상' | '중' | '하' = '중';
         if (response.physicalAttributes?.muscleStrength === '상') strengthKorean = '상';
         else if (response.physicalAttributes?.muscleStrength === '하') strengthKorean = '하';
+        const respAny: any = response as any
         const profileData = {
           name: response.name || '',
           email: response.email || '',
           phone: response.phone || '',
           birthDate: response.birthDate || '',
-          gender: '',
+          gender: respAny.gender || '',
           address: response.address || '',
           education: response.education || '',
           preferredRegion: response.preferredRegion || '전체',
@@ -208,7 +225,7 @@ function Profile() {
           workDuration: response.workDuration || '무관',
           workDays: response.workDays || '무관',
           workTime: response.workTime || '무관',
-          strengths: Array.isArray(response.strengths) ? response.strengths : [],
+          strengths: sanitizeStrengths(respAny.strengths),
           mbti: response.mbti || '',
           introduction: response.introduction || '',
           muscleStrength: strengthKorean,
@@ -592,7 +609,7 @@ function Profile() {
           muscleStrength: muscleStrength,
           height: physicalData.height,
           weight: physicalData.weight,
-          strengths: personalInfo.strengths.join(','),
+          strengths: sanitizeStrengths(personalInfo.strengths).join(','),
           mbti: personalInfo.mbti,
           introduction: personalInfo.introduction
         })
@@ -792,7 +809,7 @@ function Profile() {
     }
   }
 
-  // 지원한 일자리 불러오기 (API 연동) - 페이지 로드시 항상 불러오기
+  // 지원한 일자리 불러오기 (API 연동) + 이벤트 기반 즉시 갱신
   useEffect(() => {
     const userId = localStorage.getItem('userId')
     if (!userId) return
@@ -817,13 +834,18 @@ function Profile() {
         }
       } catch (error) {
         console.error('지원 내역을 불러오는데 실패했습니다:', error)
-        // 에러 발생 시 빈 배열로 설정
         setAppliedJobs([])
       }
     }
 
+    // 최초 로드
     fetchApplications()
-  }, []) // activeTab 의존성 제거 - 항상 로드
+
+    // 지원/취소 시 즉시 갱신
+    const onChanged = () => fetchApplications()
+    window.addEventListener('application:changed' as any, onChanged as any)
+    return () => window.removeEventListener('application:changed' as any, onChanged as any)
+  }, [])
 
   // 지원한 일자리 삭제 (API 연동)
   const handleCancelApplication = async (applicationId: number) => {

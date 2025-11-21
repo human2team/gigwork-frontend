@@ -75,6 +75,8 @@ function JobSearch() {
   const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
   const [categorySearchQuery, setCategorySearchQuery] = useState('')
   const [locationSearchQuery, setLocationSearchQuery] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const PER_PAGE = 9
 
   // localStorage에서 저장된 일자리 ID 목록 불러오기
   useEffect(() => {
@@ -83,6 +85,11 @@ function JobSearch() {
       setSavedJobIds(JSON.parse(saved))
     }
   }, [])
+
+  // 필터 변경 시 페이지 리셋
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, selectedRegion, selectedDistricts, selectedCategories, jobs])
 
   // 백엔드에서 활성 공고 불러오기
   useEffect(() => {
@@ -176,6 +183,12 @@ function JobSearch() {
     
     return matchesSearch && matchesLocation && matchesCategory
   })
+
+  // 페이지네이션 계산
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PER_PAGE))
+  const currentSafePage = Math.min(currentPage, totalPages)
+  const startIndex = (currentSafePage - 1) * PER_PAGE
+  const pageJobs = filteredJobs.slice(startIndex, startIndex + PER_PAGE)
 
   // 필터링된 카테고리
   const filteredCategories = jobCategories.filter(category => 
@@ -465,7 +478,7 @@ function JobSearch() {
             <p style={{ fontSize: '14px', color: '#999' }}>다른 검색어나 지역을 선택해보세요.</p>
           </div>
         ) : (
-          filteredJobs.map((job) => (
+          pageJobs.map((job) => (
             <div
               key={job.id}
               style={{
@@ -585,6 +598,43 @@ function JobSearch() {
           ))
         )}
       </div>
+      
+      {/* 페이지네이션 */}
+      {filteredJobs.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '24px' }}>
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentSafePage === 1}
+            style={{
+              padding: '8px 12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              backgroundColor: currentSafePage === 1 ? '#f5f5f5' : '#ffffff',
+              color: '#333',
+              cursor: currentSafePage === 1 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            이전
+          </button>
+          <span style={{ fontSize: '14px', color: '#666' }}>
+            {currentSafePage} / {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentSafePage === totalPages}
+            style={{
+              padding: '8px 12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              backgroundColor: currentSafePage === totalPages ? '#f5f5f5' : '#ffffff',
+              color: '#333',
+              cursor: currentSafePage === totalPages ? 'not-allowed' : 'pointer'
+            }}
+          >
+            다음
+          </button>
+        </div>
+      )}
     </div>
   )
 }

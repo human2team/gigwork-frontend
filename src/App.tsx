@@ -23,6 +23,7 @@ import JobseekerSettings from './pages/JobseekerSettings'
 import JobseekerLayout from './components/JobseekerLayout'
 import EmployerLayout from './components/EmployerLayout'
 import CandidateDetail from './pages/CandidateDetail'
+import ProposalDetail from './pages/ProposalDetail'
 
 function App() {
   return (
@@ -48,6 +49,7 @@ function App() {
         <Route path="search" element={<JobSearch />} />
         <Route path="recommendations" element={<Recommendations />} />
         <Route path="job/:id" element={<JobDetails />} />
+        <Route path="proposals/:id" element={<ProposalDetail />} />
         <Route path="chatbot" element={<Chatbot />} />
         <Route path="settings" element={<JobseekerSettings />} />
       </Route>

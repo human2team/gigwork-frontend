@@ -302,10 +302,22 @@ function CandidateSearch() {
                         });
                         alert('채용 제안이 취소되었습니다.');
                       } else {
+                        // 실패해도 proposedIds에서 제거하여 버튼이 제안하기로 변경되게 함
+                        setProposedIds(prev => {
+                          const updated = prev.filter(id => id !== candidate.id);
+                          localStorage.setItem('proposedIds', JSON.stringify(updated));
+                          return updated;
+                        });
                         const data = await res.json().catch(() => ({}));
                         alert(data.error || '채용 제안 취소에 실패했습니다.');
                       }
                     } catch (e) {
+                      // 네트워크 등 예외 발생 시에도 proposedIds에서 제거
+                      setProposedIds(prev => {
+                        const updated = prev.filter(id => id !== candidate.id);
+                        localStorage.setItem('proposedIds', JSON.stringify(updated));
+                        return updated;
+                      });
                       alert('채용 제안 취소에 실패했습니다.');
                     }
                   }}

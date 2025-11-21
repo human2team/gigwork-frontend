@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { apiCall, getErrorMessage } from '../utils/api';
-import ProposalDetail from './ProposalDetail';
+import { useNavigate } from 'react-router-dom';
 
 interface Proposal {
   id: number;
@@ -26,9 +26,7 @@ export default function JobseekerProposals() {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-
-  const [selectedProposalId, setSelectedProposalId] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!jobseekerProfile?.id) {
@@ -54,7 +52,7 @@ export default function JobseekerProposals() {
           <li
             key={proposal.id}
             style={{ marginBottom: 20, padding: 16, border: '1px solid #e0e0e0', borderRadius: 8, background: '#fafafa', cursor: 'pointer' }}
-            onClick={() => setSelectedProposalId(proposal.id)}
+            onClick={() => navigate(`/jobseeker/proposals/${proposal.id}`)}
           >
             <div style={{ fontWeight: 'bold', fontSize: 18 }}>{proposal.job?.title || '공고명 없음'}</div>
             <div style={{ color: '#666', marginBottom: 4 }}>{proposal.job?.company || proposal.employer?.companyName || '회사명 없음'}</div>
@@ -66,11 +64,6 @@ export default function JobseekerProposals() {
           </li>
         ))}
       </ul>
-      {selectedProposalId && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0008', zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <ProposalDetail proposalId={selectedProposalId} onClose={() => setSelectedProposalId(null)} />
-        </div>
-      )}
     </div>
   );
 }

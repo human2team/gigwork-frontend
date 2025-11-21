@@ -26,6 +26,8 @@ function Recommendations() {
   const [recommendedJobs, setRecommendedJobs] = useState<RecommendedJob[]>([])
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'suitability' | 'salary' | 'recent'>('suitability')
+  const [currentPage, setCurrentPage] = useState(1)
+  const PER_PAGE = 9
   
   // 백엔드에 등록된 직업 카테고리 (JobPosting.tsx와 동일)
   const jobCategories = [
@@ -93,6 +95,11 @@ function Recommendations() {
       setSavedJobIds(JSON.parse(saved))
     }
   }, [])
+
+  // 필터/정렬 변경 시 페이지 리셋
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [minSuitability, selectedJobTypes, sortBy, recommendedJobs])
 
   // 일자리 저장/저장 해제
   const handleSaveJob = async (jobId: number) => {
@@ -181,6 +188,12 @@ function Recommendations() {
       return b.id - a.id
     }
   })
+
+  // 페이지네이션 계산
+  const totalPages = Math.max(1, Math.ceil(sortedJobs.length / PER_PAGE))
+  const currentSafePage = Math.min(currentPage, totalPages)
+  const startIndex = (currentSafePage - 1) * PER_PAGE
+  const pageJobs = sortedJobs.slice(startIndex, startIndex + PER_PAGE)
 
   if (loading) {
     return (
@@ -403,12 +416,13 @@ function Recommendations() {
           </p>
         </div>
       ) : (
+        <>
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
           gap: '20px'
         }}>
-          {sortedJobs.map((job) => {
+          {pageJobs.map((job) => {
             // 마감 조건: status가 'CLOSED'이거나, deadline이 있고 오늘 날짜보다 이전이면 마감
             let isClosed = false;
             let debugMsg = '';
@@ -592,6 +606,43 @@ function Recommendations() {
           );
         })}
       </div>
+      {/* 페이지네이션 */}
+      {sortedJobs.length > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', marginTop: '24px' }}>
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentSafePage === 1}
+            style={{
+              padding: '8px 12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              backgroundColor: currentSafePage === 1 ? '#f5f5f5' : '#ffffff',
+              color: '#333',
+              cursor: currentSafePage === 1 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            이전
+          </button>
+          <span style={{ fontSize: '14px', color: '#666' }}>
+            {currentSafePage} / {totalPages}
+          </span>
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentSafePage === totalPages}
+            style={{
+              padding: '8px 12px',
+              border: '1px solid #e0e0e0',
+              borderRadius: '6px',
+              backgroundColor: currentSafePage === totalPages ? '#f5f5f5' : '#ffffff',
+              color: '#333',
+              cursor: currentSafePage === totalPages ? 'not-allowed' : 'pointer'
+            }}
+          >
+            다음
+          </button>
+        </div>
+      )}
+      </>
     )}
   </div>
 )
