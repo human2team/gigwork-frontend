@@ -23,10 +23,50 @@ function CandidateSearch() {
   // JobSearch 스타일 컨트롤 바용
   const [showRegionPopup, setShowRegionPopup] = useState(false)
   const [showJobPopup, setShowJobPopup] = useState(false)
-  const regionOptions = [
-    '전체','서울','경기','인천','부산','대구','광주','대전','울산','세종',
-    '강원','충북','충남','전북','전남','경북','경남','제주'
-  ]
+  // 동적 지역(법정동) 목록
+  type LegalItem = { code: string; name: string }
+  const [siList, setSiList] = useState<LegalItem[]>([])
+  const [sggList, setSggList] = useState<LegalItem[]>([])
+  const [emdList, setEmdList] = useState<LegalItem[]>([])
+  const [selectedSi, setSelectedSi] = useState<LegalItem | null>(null)
+  const [selectedSgg, setSelectedSgg] = useState<LegalItem | null>(null)
+  const [selectedEmd, setSelectedEmd] = useState<LegalItem | null>(null)
+  const ensureLoadSi = async () => {
+    if (siList.length > 0) return
+    try {
+      const res = await fetch('/api/locations/si')
+      if (res.ok) {
+        const data: any[] = await res.json()
+        setSiList((Array.isArray(data) ? data : []).map(d => ({ code: d.code, name: d.name })))
+      }
+    } catch {}
+  }
+  const loadSgg = async (siCode: string) => {
+    try {
+      const res = await fetch(`/api/locations/sgg?siCode=${encodeURIComponent(siCode)}`)
+      if (res.ok) {
+        const data: any[] = await res.json()
+        setSggList((Array.isArray(data) ? data : []).map(d => ({ code: d.code, name: d.name })))
+      } else {
+        setSggList([])
+      }
+      setEmdList([])
+      setSelectedSgg(null)
+      setSelectedEmd(null)
+    } catch { setSggList([]); setEmdList([]) }
+  }
+  const loadEmd = async (sggCode: string) => {
+    try {
+      const res = await fetch(`/api/locations/emd?sggCode=${encodeURIComponent(sggCode)}`)
+      if (res.ok) {
+        const data: any[] = await res.json()
+        setEmdList((Array.isArray(data) ? data : []).map(d => ({ code: d.code, name: d.name })))
+      } else {
+        setEmdList([])
+      }
+      setSelectedEmd(null)
+    } catch { setEmdList([]) }
+  }
   // 업직종 2단(백엔드 연동)
   type CategoryItem = { cd: string; nm: string }
   const [jobMainCats, setJobMainCats] = useState<CategoryItem[]>([])
@@ -154,11 +194,11 @@ function CandidateSearch() {
         return;
       }
       try {
-        // 가능한 엔드포인트 순회. 404를 줄이기 위해 가장 일반적인 쿼리파라미터 형태를 먼저 시도
+        // 가능한 엔드포인트 순회. 405/404를 피하기 위해 path형을 우선 시도
         const tryUrls = [
-          `/api/proposals?employerId=${currentEmployerId}`,
           `/api/proposals/employer/${currentEmployerId}`,
-          `/api/proposals/employer/${currentEmployerId}/jobseekers`
+          `/api/proposals/employer/${currentEmployerId}/jobseekers`,
+          `/api/proposals?employerId=${currentEmployerId}`
         ];
         let fetched: any[] | null = null;
         let lastStatus: number | undefined = undefined;
@@ -221,16 +261,22 @@ function CandidateSearch() {
   }
   const getPreferredRegion = (c: any): string => pickFirst(c, [
     ['preferredRegion'], ['preferred_region'], ['preferredregion'],
+    ['jobseeker','preferredRegion'], ['jobseeker','preferred_region'],
+    ['user','preferredRegion'], ['user','preferred_region'],
     ['profile','preferredRegion'], ['profile','preferred_region'],
     ['jobseekerProfile','preferredRegion'], ['jobseekerProfile','preferred_region'],
   ])
   const getPreferredDistrict = (c: any): string => pickFirst(c, [
     ['preferredDistrict'], ['preferred_district'], ['preferreddistrict'],
+    ['jobseeker','preferredDistrict'], ['jobseeker','preferred_district'],
+    ['user','preferredDistrict'], ['user','preferred_district'],
     ['profile','preferredDistrict'], ['profile','preferred_district'],
     ['jobseekerProfile','preferredDistrict'], ['jobseekerProfile','preferred_district'],
   ])
   const getPreferredDong = (c: any): string => pickFirst(c, [
     ['preferredDong'], ['preferred_dong'], ['preferreddong'],
+    ['jobseeker','preferredDong'], ['jobseeker','preferred_dong'],
+    ['user','preferredDong'], ['user','preferred_dong'],
     ['profile','preferredDong'], ['profile','preferred_dong'],
     ['jobseekerProfile','preferredDong'], ['jobseekerProfile','preferred_dong'],
   ])
@@ -239,7 +285,7 @@ function CandidateSearch() {
     const district = getPreferredDistrict(c)
     const dong = getPreferredDong(c)
     const parts = [region, district, (dong && dong !== '전체') ? dong : ''].filter(Boolean)
-    if (parts.length === 0) return c?.location || '희망 지역 정보 없음'
+    if (parts.length === 0) return '희망 지역 정보 없음'
     return parts.join(' ')
   }
 
@@ -286,7 +332,7 @@ function CandidateSearch() {
         {/* 지역 */}
         <div style={{ position: 'relative' }}>
           <button
-            onClick={() => setShowRegionPopup(!showRegionPopup)}
+            onClick={() => { setShowRegionPopup(!showRegionPopup); ensureLoadSi() }}
             style={{
               padding: '10px 12px',
               border: '1px solid #e0e0e0',
@@ -306,7 +352,7 @@ function CandidateSearch() {
               position: 'absolute',
               top: 'calc(100% + 8px)',
               left: 0,
-              width: 260,
+              width: 680,
               backgroundColor: '#fff',
               border: '1px solid #e0e0e0',
               borderRadius: 8,
@@ -315,34 +361,75 @@ function CandidateSearch() {
               zIndex: 10
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 12, color: '#999' }}>한 지역 선택</div>
+                <div style={{ fontSize: 12, color: '#999' }}>시/도 → 시/군/구 → 읍/면/동</div>
                 <button
                   type="button"
-                  onClick={() => setLocationFilter('전체')}
+                  onClick={() => { setSelectedSi(null); setSelectedSgg(null); setSelectedEmd(null); setSggList([]); setEmdList([]) }}
                   style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
                 >
                   초기화
                 </button>
               </div>
-              <div style={{ overflowY: 'auto', maxHeight: 180 }}>
-                {regionOptions.map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => { setLocationFilter(r); setShowRegionPopup(false) }}
-                    style={{
-                      width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
-                      background: locationFilter === r ? '#e3f2fd' : 'transparent',
-                      color: locationFilter === r ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
-                    }}
-                  >
-                    {r}
-                  </button>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, maxHeight: 320 }}>
+                {/* 시/도 */}
+                <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                  {siList.map(si => (
+                    <button
+                      key={si.code}
+                      type="button"
+                      onClick={() => { setSelectedSi(si); loadSgg(si.code) }}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                        background: selectedSi?.code === si.code ? '#e3f2fd' : 'transparent',
+                        color: selectedSi?.code === si.code ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                      }}
+                    >
+                      {si.name}
+                    </button>
+                  ))}
+                </div>
+                {/* 시군구 */}
+                <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                  {sggList.map(sgg => (
+                    <button
+                      key={sgg.code}
+                      type="button"
+                      onClick={() => { setSelectedSgg(sgg); loadEmd(sgg.code) }}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                        background: selectedSgg?.code === sgg.code ? '#e3f2fd' : 'transparent',
+                        color: selectedSgg?.code === sgg.code ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                      }}
+                    >
+                      {sgg.name}
+                    </button>
+                  ))}
+                </div>
+                {/* 읍면동 */}
+                <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                  {emdList.map(emd => (
+                    <button
+                      key={emd.code}
+                      type="button"
+                      onClick={() => setSelectedEmd(emd)}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                        background: selectedEmd?.code === emd.code ? '#e3f2fd' : 'transparent',
+                        color: selectedEmd?.code === emd.code ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                      }}
+                    >
+                      {emd.name}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
                 <button
-                  onClick={() => setShowRegionPopup(false)}
+                  onClick={() => {
+                    const label = selectedEmd?.name || selectedSgg?.name || selectedSi?.name || '전체'
+                    setLocationFilter(label || '전체')
+                    setShowRegionPopup(false)
+                  }}
                   style={{ padding: '8px 14px', border: 'none', borderRadius: 6, background: '#2196f3', color: '#fff', cursor: 'pointer' }}
                 >
                   적용
@@ -574,10 +661,10 @@ function CandidateSearch() {
             fontWeight: 600
           }}>
             <div>이름 / 경력</div>
-            <div>이력서 요약</div>
+            <div>프로필 요약</div>
             <div>희망근무지역</div>
             <div>수정일</div>
-            <div style={{ textAlign: 'right' }}>액션</div>
+            <div style={{ textAlign: 'center' }}>액션</div>
           </div>
           {/* Rows */}
           {filteredCandidates.map((candidate) => {
@@ -630,12 +717,29 @@ function CandidateSearch() {
                     </div>
                   </div>
                 </div>
-                {/* 요약 */}
+                {/* 프로필 요약 + 업종별 카테고리 */}
                 <div
                   onClick={() => navigate(`/employer/candidates/${candidate.id}`)}
-                  style={{ fontSize: 14, color: '#555', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'pointer' }}
+                  style={{ fontSize: 14, color: '#555', overflow: 'hidden', cursor: 'pointer' }}
                 >
-                  {candidate.summary || candidate.experience?.[0] || '요약 정보가 없습니다.'}
+                  <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                    {candidate.summary || candidate.experience?.[0] || '요약 정보가 없습니다.'}
+                  </div>
+                  {(() => {
+                    const desiredRaw = Array.isArray(candidate.desiredCategories)
+                      ? candidate.desiredCategories
+                      : (candidate.desiredCategory ? [candidate.desiredCategory] : [])
+                    const desiredNames = desiredRaw
+                      .map((v: any) => String(v).trim())
+                      .filter((v: string) => v.length > 0)
+                    if (desiredNames.length === 0) return null
+                    const display = `${desiredNames.slice(0, 3).join(', ')}${desiredNames.length > 3 ? ` 외 ${desiredNames.length - 3}개` : ''}`
+                    return (
+                      <div style={{ marginTop: 4, fontSize: 12, color: '#888', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                        {display}
+                      </div>
+                    )
+                  })()}
                 </div>
                 {/* 희망지역 */}
                 <div style={{ fontSize: 14, color: '#555' }}>
@@ -645,7 +749,7 @@ function CandidateSearch() {
                 {/* 수정일 */}
                 <div style={{ fontSize: 13, color: '#999' }}>{updatedAgo}</div>
                 {/* 액션 */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
                   {proposedIds.includes(candidate.id) ? (
                     <button
                       onClick={async () => {
