@@ -190,6 +190,42 @@ function Profile() {
   // 현재 편집 중인 개인정보
   const [personalInfo, setPersonalInfo] = useState(initialPersonalInfo)
   
+  // 희망 업직종(카테고리) 선택 상태 및 로더
+  type CategoryItem = { cd: string; nm: string }
+  const [jobMainCats, setJobMainCats] = useState<CategoryItem[]>([])
+  const [jobSubCatsByMain, setJobSubCatsByMain] = useState<Record<string, CategoryItem[]>>({})
+  const [selectedJobMainCd, setSelectedJobMainCd] = useState<string>('')
+  const [desiredJobSubcats, setDesiredJobSubcats] = useState<string[]>([]) // 소분류 이름 목록
+  const [showJobPopup, setShowJobPopup] = useState(false)
+  const ensureLoadMainCats = async () => {
+    if (jobMainCats.length > 0) return
+    try {
+      const res = await fetch(`/api/categories?kind=01&depth=1`)
+      if (res.ok) {
+        const data: CategoryItem[] = await res.json()
+        if (Array.isArray(data) && data.length > 0) {
+          setJobMainCats(data)
+          setSelectedJobMainCd(data[0].cd)
+        }
+      }
+    } catch {}
+  }
+  const ensureLoadSubCats = async (mainCd: string) => {
+    if (!mainCd) return
+    if (jobSubCatsByMain[mainCd]) return
+    try {
+      const res = await fetch(`/api/categories?kind=01&depth=2&parent=${encodeURIComponent(mainCd)}`)
+      if (res.ok) {
+        const data: CategoryItem[] = await res.json()
+        setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: Array.isArray(data) ? data : [] }))
+      } else {
+        setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: [] }))
+      }
+    } catch {
+      setJobSubCatsByMain(prev => ({ ...prev, [mainCd]: [] }))
+    }
+  }
+  
   // 프로필 로딩 상태
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   
@@ -234,6 +270,13 @@ function Profile() {
         };
         setPersonalInfo(profileData);
         setSavedPersonalInfo(profileData);
+        // 희망 업직종 초기화 (백엔드에서 콤마 구분 문자열로 전달)
+        if (respAny && respAny.desiredCategoryNames) {
+          const arr = String(respAny.desiredCategoryNames).split(',').map((s: string) => s.trim()).filter(Boolean)
+          setDesiredJobSubcats(arr)
+        } else {
+          setDesiredJobSubcats([])
+        }
         const physicalInfo = {
           strength: strengthKorean,
           height: response.physicalAttributes?.height || 175,
@@ -588,6 +631,10 @@ function Profile() {
       if (physicalData.strength === '상') muscleStrength = 'HIGH'
       else if (physicalData.strength === '하') muscleStrength = 'LOW'
       
+      // 선택된 소분류 이름을 코드로 가능한 만큼 매핑
+      const allLoadedSubcats = Object.values(jobSubCatsByMain).flat()
+      const codeByName = new Map(allLoadedSubcats.map(i => [i.nm, i.cd]))
+      const desiredCodes = desiredJobSubcats.map(nm => codeByName.get(nm) || '').filter((v, i, a) => v && a.indexOf(v) === i)
       await apiCall(`/api/jobseeker/profile/${userId}`, {
         method: 'PUT',
         headers: {
@@ -611,7 +658,9 @@ function Profile() {
           weight: physicalData.weight,
           strengths: sanitizeStrengths(personalInfo.strengths).join(','),
           mbti: personalInfo.mbti,
-          introduction: personalInfo.introduction
+          introduction: personalInfo.introduction,
+          desiredCategoryCodes: desiredCodes.join(','),
+          desiredCategoryNames: desiredJobSubcats.join(',')
         })
       })
       
@@ -691,6 +740,11 @@ function Profile() {
       if (physicalData.strength === '상') muscleStrength = 'HIGH'
       else if (physicalData.strength === '하') muscleStrength = 'LOW'
       
+      // 선택된 소분류 이름을 코드로 가능한 만큼 매핑(동일 로직)
+      const allLoadedSubcats = Object.values(jobSubCatsByMain).flat()
+      const codeByName = new Map(allLoadedSubcats.map(i => [i.nm, i.cd]))
+      const desiredCodes = desiredJobSubcats.map(nm => codeByName.get(nm) || '').filter((v, i, a) => v && a.indexOf(v) === i)
+      
       await apiCall(`/api/jobseeker/profile/${userId}`, {
         method: 'PUT',
         headers: {
@@ -714,7 +768,9 @@ function Profile() {
           weight: physicalData.weight,
           strengths: personalInfo.strengths.join(','),
           mbti: personalInfo.mbti,
-          introduction: personalInfo.introduction
+          introduction: personalInfo.introduction,
+          desiredCategoryCodes: desiredCodes.join(','),
+          desiredCategoryNames: desiredJobSubcats.join(',')
         })
       })
       
@@ -1368,6 +1424,131 @@ function Profile() {
                   </div>
                 )}
               </div>
+            </div>
+            {/* 희망 업직종 */}
+            <div style={{ marginTop: '16px' }}>
+              <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>희망 업직종</h4>
+              <div style={{ position: 'relative' }}>
+                {/* 표시용 선택명 변환(소분류 '전체' → 현재 대분류명) */}
+                {(() => {
+                  const mainNm = (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm) || ''
+                  const displayNames = desiredJobSubcats.map(n => n === '전체' ? (mainNm || '전체') : n)
+                  return (
+                <button
+                  type="button"
+                  onClick={() => { setShowJobPopup(!showJobPopup); ensureLoadMainCats(); if (selectedJobMainCd) ensureLoadSubCats(selectedJobMainCd) }}
+                  style={{
+                    padding: '10px 12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    backgroundColor: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    maxWidth: 420
+                  }}
+                >
+                  <span style={{ display: 'inline-block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {displayNames.length > 0
+                      ? `${displayNames.slice(0, 2).join(', ')}${displayNames.length > 2 ? ` 외 ${displayNames.length - 2}개` : ''}`
+                      : '선택된 소분류 0개'}
+                  </span>
+                  <ChevronDown size={16} color="#666" />
+                </button>
+                  )
+                })()}
+                {showJobPopup && (
+                  <div style={{
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    left: 0,
+                    width: 680,
+                    backgroundColor: '#fff',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: 8,
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    padding: 12,
+                    zIndex: 10
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, color: '#999' }}>최대 3개까지 선택 가능</div>
+                      <button
+                        type="button"
+                        onClick={() => { if (jobMainCats[0]) setSelectedJobMainCd(jobMainCats[0].cd); setDesiredJobSubcats([]) }}
+                        style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
+                      >
+                        초기화
+                      </button>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 12, maxHeight: 320 }}>
+                      {/* 대분류 */}
+                      <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                        {jobMainCats.map(main => (
+                          <button
+                            key={main.cd}
+                            type="button"
+                            onClick={() => { setSelectedJobMainCd(main.cd); ensureLoadSubCats(main.cd) }}
+                            style={{
+                              width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                              background: selectedJobMainCd === main.cd ? '#e3f2fd' : 'transparent',
+                              color: selectedJobMainCd === main.cd ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                            }}
+                          >
+                            {main.nm}
+                          </button>
+                        ))}
+                      </div>
+                      {/* 소분류 */}
+                      <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
+                          {(jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm) || []).map(sub => {
+                            const selected = desiredJobSubcats.includes(sub)
+                            return (
+                              <label key={`${selectedJobMainCd}-${sub}`} style={{
+                                display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
+                                border: selected ? '1px solid #2196f3' : '1px solid #e0e0e0',
+                                background: selected ? '#e3f2fd' : '#fff', borderRadius: 6, cursor: 'pointer'
+                              }}>
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setDesiredJobSubcats(prev => prev.length >= 3 ? prev : [...prev, sub])
+                                    } else {
+                                      setDesiredJobSubcats(prev => prev.filter(s => s !== sub))
+                                    }
+                                  }}
+                                />
+                                <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{sub}</span>
+                              </label>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowJobPopup(false)}
+                        style={{ padding: '8px 14px', border: 'none', borderRadius: 6, background: '#2196f3', color: '#fff', cursor: 'pointer' }}
+                      >
+                        적용
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {desiredJobSubcats.length > 0 && (() => {
+                const mainNm = (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm) || ''
+                const displayNames = desiredJobSubcats.map(n => n === '전체' ? (mainNm || '전체') : n)
+                return (
+                <div style={{ marginTop: 8, color: '#666', fontSize: 13 }}>
+                  선택됨: {displayNames.join(', ')}
+                </div>
+                )
+              })()}
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', maxWidth: '800px' }}>
 

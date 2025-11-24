@@ -32,7 +32,7 @@ function EmployerLogin() {
         })
       })
       
-      console.log('로그인 성공:', response)
+      // 로그인 성공 처리
       
       // userType 확인
       if (response.userType !== 'EMPLOYER') {
@@ -61,7 +61,6 @@ function EmployerLogin() {
       // Context 로그인 상태 업데이트
       login('employer')
       
-      alert(response.message || '로그인에 성공했습니다!')
       navigate('/employer/jobs')
     } catch (error) {
       console.error('로그인 실패:', error)

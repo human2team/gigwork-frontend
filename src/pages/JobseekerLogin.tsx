@@ -34,7 +34,11 @@ function JobseekerLogin() {
         })
       })
       
-      console.log('로그인 성공:', response)
+      // 로그인 성공 처리 (구직자 전용 가드)
+      if (response.userType !== 'JOBSEEKER') {
+        alert('구직자 계정이 아닙니다.')
+        return
+      }
       
       // userId를 localStorage에 저장
       localStorage.setItem('userId', response.userId.toString())
@@ -57,7 +61,6 @@ function JobseekerLogin() {
       // Context 로그인 상태 업데이트
       login('jobseeker')
 
-      alert(response.message || '로그인에 성공했습니다!')
       navigate('/jobseeker/search')
     } catch (error) {
       console.error('로그인 실패:', error)
