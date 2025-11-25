@@ -62,28 +62,11 @@ const isDeadlineToday = (deadline?: string): boolean => {
 
 // 업직종 2단 구조 - 서버에서 불러옴
 type CategoryItem = { cd: string; nm: string }
+type RegionItem = { code: string; name: string; sido?: string; sgg?: string; umd?: string }
+type DistrictItem = { code: string; name: string }
+type DongItem = { code: string; name: string }
 
-// 시/도 데이터
-const regions: Record<string, string[]> = {
-  '전체': [],
-  '서울': ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'],
-  '부산': ['강서구', '금정구', '기장군', '남구', '동구', '동래구', '부산진구', '북구', '사상구', '사하구', '서구', '수영구', '연제구', '영도구', '중구', '해운대구'],
-  '대구': ['남구', '달서구', '달성군', '동구', '북구', '서구', '수성구', '중구'],
-  '인천': ['강화군', '계양구', '미추홀구', '남동구', '동구', '부평구', '서구', '연수구', '옹진군', '중구'],
-  '광주': ['광산구', '남구', '동구', '북구', '서구'],
-  '대전': ['대덕구', '동구', '서구', '유성구', '중구'],
-  '울산': ['남구', '동구', '북구', '울주군', '중구'],
-  '세종': ['세종시'],
-  '경기': ['가평군', '고양시', '과천시', '광명시', '광주시', '구리시', '군포시', '김포시', '남양주시', '동두천시', '부천시', '성남시', '수원시', '시흥시', '안산시', '안성시', '안양시', '양주시', '양평군', '여주시', '연천군', '오산시', '용인시', '의왕시', '의정부시', '이천시', '파주시', '평택시', '포천시', '하남시', '화성시'],
-  '강원': ['강릉시', '고성군', '동해시', '삼척시', '속초시', '양구군', '양양군', '영월군', '원주시', '인제군', '정선군', '철원군', '춘천시', '태백시', '평창군', '홍천군', '화천군', '횡성군'],
-  '충북': ['괴산군', '단양군', '보은군', '영동군', '옥천군', '음성군', '제천시', '증평군', '진천군', '청주시', '충주시'],
-  '충남': ['계룡시', '공주시', '금산군', '논산시', '당진시', '보령시', '부여군', '서산시', '서천군', '아산시', '예산군', '천안시', '청양군', '태안군', '홍성군'],
-  '전북': ['고창군', '군산시', '김제시', '남원시', '무주군', '부안군', '순창군', '완주군', '익산시', '임실군', '장수군', '전주시', '정읍시', '진안군'],
-  '전남': ['강진군', '고흥군', '곡성군', '광양시', '구례군', '나주시', '담양군', '목포시', '무안군', '보성군', '순천시', '신안군', '여수시', '영광군', '영암군', '완도군', '장성군', '장흥군', '진도군', '함평군', '해남군', '화순군'],
-  '경북': ['경산시', '경주시', '고령군', '구미시', '군위군', '김천시', '문경시', '봉화군', '상주시', '성주군', '안동시', '영덕군', '영양군', '영주시', '영천시', '예천군', '울릉군', '울진군', '의성군', '청도군', '청송군', '칠곡군', '포항시'],
-  '경남': ['거제시', '거창군', '고성군', '김해시', '남해군', '밀양시', '사천시', '산청군', '양산시', '의령군', '진주시', '진해시', '창녕군', '창원시', '통영시', '하동군', '함안군', '함양군', '합천군'],
-  '제주': ['서귀포시', '제주시']
-}
+// ...existing code...
 
 // 구/군 → 동 매핑 (예시: 필요한 구만 우선 추가, 나머지는 비워둠)
 const dongsByDistrict: Record<string, string[]> = {
@@ -99,15 +82,65 @@ const getDongs = (region: string, district: string): string[] => {
 }
 
 function JobSearch() {
+
+  // 시/도 데이터 (Hook 선언을 컴포넌트 내부로 이동)
+  const [regions, setRegions] = useState<RegionItem[]>([]);
+  const [districts, setDistricts] = useState<DistrictItem[]>([]);
+  const [dongs, setDongs] = useState<DongItem[]>([]);
+  const [selectedRegionCode, setSelectedRegionCode] = useState<string>('');
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState<string>('');
+  const [selectedDongCode, setSelectedDongCode] = useState<string>('');
+
+  useEffect(() => {
+    fetch('/api/regions')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          // name, code, sido, sgg, umd 모두 포함된 데이터로 변환
+          setRegions(data.map((r: any) => ({
+            code: r.code,
+            name: r.name,
+            sido: r.sido,
+            sgg: r.sgg,
+            umd: r.umd
+          })))
+        }
+      })
+      .catch(() => setRegions([]))
+  }, []);
+
+  useEffect(() => {
+    if (!selectedRegionCode) return;
+    // 시/도는 code 전체(법정동코드)로 전달
+    fetch(`/api/districts?region=${encodeURIComponent(selectedRegionCode)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setDistricts(data)
+        else setDistricts([])
+      })
+      .catch(() => setDistricts([]))
+  }, [selectedRegionCode]);
+
+  useEffect(() => {
+    if (!selectedDistrictCode || !selectedRegionCode) return;
+    // 시군구도 code 전체(법정동코드)로 전달
+    fetch(`/api/dongs?district=${encodeURIComponent(selectedDistrictCode)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setDongs(data)
+        else setDongs([])
+      })
+      .catch(() => setDongs([]))
+  }, [selectedDistrictCode, selectedRegionCode]);
   const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
   const [savedJobIds, setSavedJobIds] = useState<number[]>([])
   const [jobs, setJobs] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'job' | 'location' | 'search'>('job')
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [selectedRegion, setSelectedRegion] = useState<string>('전체')
-  const [selectedDistricts, setSelectedDistricts] = useState<string[]>([])
-  const [selectedDongs, setSelectedDongs] = useState<string[]>([])
+  // ...중복 선언 제거됨...
+  const [selectedDistrictCodes, setSelectedDistrictCodes] = useState<string[]>([]);
+  const [selectedDongCodes, setSelectedDongCodes] = useState<string[]>([]);
   // 새 컨트롤 바 상태
   const [showRegionPopup, setShowRegionPopup] = useState(false)
   const [showJobPopup, setShowJobPopup] = useState(false)
@@ -187,7 +220,7 @@ function JobSearch() {
   // 필터 변경 시 페이지 리셋
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, selectedRegion, selectedDistricts, selectedCategories, jobs])
+  }, [searchQuery, selectedRegionCode, selectedDistrictCodes, selectedCategories, jobs])
 
   // 백엔드에서 활성 공고 불러오기
   useEffect(() => {
@@ -265,41 +298,38 @@ function JobSearch() {
     const matchesSearch = searchQuery === '' || 
       job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    let matchesLocation = true
-    if (selectedRegion !== '전체' || selectedDistricts.length > 0) {
-      if (selectedDistricts.length > 0) {
-        // 동이 선택되어 있으면 동 기준으로, 아니면 구/군 기준으로
-        if (selectedDongs.length > 0) {
-          // '전체'가 포함되어 있으면 동 필터를 구/군 기준으로 완화
-          if (selectedDongs.includes('전체')) {
-            matchesLocation = selectedDistricts.some(district => job.location.includes(district))
-          } else {
-            matchesLocation = selectedDongs.some(dong => job.location.includes(dong))
-          }
-        } else {
-          matchesLocation = selectedDistricts.some(district => job.location.includes(district))
-        }
-      } else if (selectedRegion !== '전체') {
-        matchesLocation = job.location.includes(selectedRegion)
-      }
+      job.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // 지역명 기반 필터링
+    let matchesLocation = true;
+    // 선택된 시/도, 시/군/구, 동의 이름을 가져옴
+    const regionName = regions.find(r => r.code === selectedRegionCode)?.name || '';
+    const districtName = districts.find(d => d.code === selectedDistrictCode)?.name || '';
+    const dongName = dongs.find(d => d.code === selectedDongCode)?.name || '';
+
+    if (regionName) {
+      matchesLocation = job.location.includes(regionName);
     }
-    
-    // 카테고리 매칭: 기존 selectedCategories 또는 새 selectedJobSubcats 중 하나라도 일치
+    if (matchesLocation && districtName) {
+      matchesLocation = job.location.includes(districtName);
+    }
+    if (matchesLocation && dongName) {
+      matchesLocation = job.location.includes(dongName);
+    }
+
     const baseCategoryMatch = selectedCategories.length === 0 || selectedCategories.some(selectedCat => {
-      const normalizedSelected = selectedCat.replace(/·/g, '.').toLowerCase()
-      const normalizedJob = (job.category || '').replace(/·/g, '.').toLowerCase()
-      return normalizedSelected === normalizedJob
-    })
+      const normalizedSelected = selectedCat.replace(/·/g, '.').toLowerCase();
+      const normalizedJob = (job.category || '').replace(/·/g, '.').toLowerCase();
+      return normalizedSelected === normalizedJob;
+    });
     const subcatMatch =
       selectedJobSubcats.length === 0 ||
-      selectedJobSubcats.some(sub => (job.category || '').toLowerCase().includes(sub.toLowerCase()))
-    const barExcluded = excludeBar ? !((job.category || '').toLowerCase().includes('bar')) : true
-    const matchesCategory = baseCategoryMatch && subcatMatch && barExcluded
-    
-    return matchesSearch && matchesLocation && matchesCategory
-  })
+      selectedJobSubcats.some(sub => (job.category || '').toLowerCase().includes(sub.toLowerCase()));
+    const barExcluded = excludeBar ? !((job.category || '').toLowerCase().includes('bar')) : true;
+    const matchesCategory = baseCategoryMatch && subcatMatch && barExcluded;
+
+    return matchesSearch && matchesLocation && matchesCategory;
+  });
 
   // 페이지네이션 계산
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PER_PAGE))
@@ -308,9 +338,9 @@ function JobSearch() {
   const pageJobs = filteredJobs.slice(startIndex, startIndex + PER_PAGE)
 
   // 필터링된 지역
-  const filteredRegions = Object.keys(regions).filter(region =>
-    locationSearchQuery === '' || region.includes(locationSearchQuery)
-  )
+  const filteredRegions = regions.filter(region =>
+    locationSearchQuery === '' || region.name.includes(locationSearchQuery)
+  );
 
   return (
     <div>
@@ -342,11 +372,11 @@ function JobSearch() {
               gap: 6
             }}
           >
-            지역{selectedDistricts.length > 0 || selectedDongs.length > 0 ? `(${(selectedDongs.length || selectedDistricts.length)})` : ''}
+            지역
             <ChevronDown size={16} />
           </button>
           {showRegionPopup && (
-          <div style={{
+            <div style={{
               position: 'absolute',
               top: 'calc(100% + 8px)',
               left: 0,
@@ -359,114 +389,92 @@ function JobSearch() {
               zIndex: 10
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 12, color: '#999' }}>최대 5개까지 선택 가능</div>
+                <div style={{ fontSize: 12, color: '#999' }}>지역 선택</div>
                 <button
-                  onClick={() => { setSelectedRegion('전체'); setSelectedDistricts([]); setSelectedDongs([]) }}
+                  onClick={() => { setSelectedRegionCode(''); setSelectedDistrictCode(''); setSelectedDongCode(''); setDistricts([]); setDongs([]); }}
                   style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
-                >
-                  초기화
-                </button>
+                >초기화</button>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 320px', gap: 12 }}>
                 {/* 시/도 */}
                 <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
-                  {Object.keys(regions).filter(r => r !== '전체').map(region => (
+                  {filteredRegions.map(region => (
                     <button
-                      key={region}
-                      onClick={() => { setSelectedRegion(region); setSelectedDistricts([]); setSelectedDongs([]) }}
+                      key={region.code}
+                      onClick={() => { setSelectedRegionCode(region.code); setSelectedDistrictCodes([]); setSelectedDongCodes([]); setSelectedDistrictCode(''); setSelectedDongCode(''); setDistricts([]); setDongs([]); }}
                       style={{
                         width: '100%',
                         textAlign: 'left',
                         padding: '8px 10px',
                         border: 'none',
-                        background: selectedRegion === region ? '#e3f2fd' : 'transparent',
-                        color: selectedRegion === region ? '#2196f3' : '#333',
+                        background: selectedRegionCode === region.code ? '#e3f2fd' : 'transparent',
+                        color: selectedRegionCode === region.code ? '#2196f3' : '#333',
                         cursor: 'pointer',
                         borderRadius: 6
                       }}
                     >
-                      {region}
+                      {region.name}
                     </button>
                   ))}
                 </div>
                 {/* 구/군 */}
                 <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
-                  {selectedRegion !== '전체' && regions[selectedRegion]?.map(district => {
-                    const selected = selectedDistricts.includes(district)
-                    return (
-                      <label key={district} style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
-                        background: selected ? '#e3f2fd' : 'transparent', borderRadius: 6, cursor: 'pointer'
-                      }}>
-                        <input
-                          type="checkbox"
-                          checked={selected}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedDistricts(prev => [...prev, district])
-                              // 해당 구 선택 시 동 초기화
-                              setSelectedDongs(prev => prev.filter(d => !getDongs(selectedRegion, district).includes(d)))
-                            } else {
-                              setSelectedDistricts(prev => prev.filter(d => d !== district))
-                              setSelectedDongs(prev => prev.filter(d => !getDongs(selectedRegion, district).includes(d)))
-                            }
-                          }}
-                        />
-                        <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333' }}>{district}</span>
-                      </label>
-                    )
-                  })}
+                  {districts.map(district => (
+                    <label key={district.code} style={{
+                      display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px',
+                      background: selectedDistrictCodes.includes(district.code) ? '#e3f2fd' : 'transparent', borderRadius: 6, cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedDistrictCodes.includes(district.code)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedDistrictCodes(prev => [...prev, district.code]);
+                            setSelectedDistrictCode(district.code);
+                          } else {
+                            setSelectedDistrictCodes(prev => prev.filter(code => code !== district.code));
+                            setSelectedDistrictCode('');
+                          }
+                          setSelectedDongCodes([]);
+                          setSelectedDongCode('');
+                          setDongs([]);
+                        }}
+                      />
+                      <span style={{ fontSize: 13, color: selectedDistrictCodes.includes(district.code) ? '#2196f3' : '#333' }}>{district.name}</span>
+                    </label>
+                  ))}
                 </div>
                 {/* 동 */}
                 <div style={{ overflowY: 'auto', maxHeight: 220 }}>
-                  {selectedRegion !== '전체' && selectedDistricts.length > 0 ? (
-                    <>
-                      {selectedDistricts.map(district => {
-                        const dongs = getDongs(selectedRegion, district)
-                        return (
-                          <div key={district} style={{ marginBottom: 8 }}>
-                            <div style={{ fontSize: 12, color: '#999', marginBottom: 6 }}>{district}</div>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
-                              {(dongs.length > 0 ? dongs : ['전체']).map(dong => {
-                                const selected = selectedDongs.includes(dong)
-                                return (
-                                  <label key={`${district}-${dong}`} style={{
-                                    display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
-                                    border: selected ? '1px solid #2196f3' : '1px solid #e0e0e0',
-                                    background: selected ? '#e3f2fd' : '#fff', borderRadius: 6, cursor: 'pointer'
-                                  }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={selected}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedDongs(prev => prev.length >= 5 ? prev : [...prev, dong])
-                                        } else {
-                                          setSelectedDongs(prev => prev.filter(d => d !== dong))
-                                        }
-                                      }}
-                                    />
-                                    <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{dong}</span>
-                                  </label>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </>
-                  ) : (
-                    <div style={{ fontSize: 13, color: '#999' }}>구/군을 먼저 선택하세요</div>
-                  )}
+                  {dongs.map(dong => (
+                    <label key={dong.code} style={{
+                      display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
+                      border: selectedDongCodes.includes(dong.code) ? '1px solid #2196f3' : '1px solid #e0e0e0',
+                      background: selectedDongCodes.includes(dong.code) ? '#e3f2fd' : '#fff', borderRadius: 6, cursor: 'pointer'
+                    }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedDongCodes.includes(dong.code)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedDongCodes(prev => [...prev, dong.code]);
+                            setSelectedDongCode(dong.code);
+                          } else {
+                            setSelectedDongCodes(prev => prev.filter(code => code !== dong.code));
+                            setSelectedDongCode('');
+                          }
+                        }}
+                      />
+                      <span style={{ fontSize: 13, color: selectedDongCodes.includes(dong.code) ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{dong.name}</span>
+                    </label>
+                  ))}
                 </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
                 <button
                   onClick={() => setShowRegionPopup(false)}
                   style={{ padding: '8px 14px', border: 'none', borderRadius: 6, background: '#2196f3', color: '#fff', cursor: 'pointer' }}
-                >
-                  적용
-                </button>
+                >적용</button>
               </div>
             </div>
           )}
