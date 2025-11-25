@@ -33,6 +33,7 @@ function CandidateSearch() {
   const [jobSubCatsByMain, setJobSubCatsByMain] = useState<Record<string, CategoryItem[]>>({})
   const [selectedJobMainCd, setSelectedJobMainCd] = useState<string>('')
   const [selectedJobSubcats, setSelectedJobSubcats] = useState<string[]>([])
+  const [selectAllSubcats, setSelectAllSubcats] = useState<boolean>(false)
   const [excludeBar, setExcludeBar] = useState(false)
   const ensureLoadMainCats = async () => {
     if (jobMainCats.length > 0) return
@@ -42,7 +43,7 @@ function CandidateSearch() {
         const data: CategoryItem[] = await res.json()
         if (Array.isArray(data) && data.length > 0) {
           setJobMainCats(data)
-          setSelectedJobMainCd(data[0].cd)
+          setSelectedJobMainCd('')
         }
       }
     } catch {}
@@ -267,9 +268,24 @@ function CandidateSearch() {
       .flat()
       .filter((v) => v != null)
       .map((v) => String(v).toLowerCase())
-    const subcatMatch =
-      selectedJobSubcats.length === 0 ||
-      selectedJobSubcats.some(sub => catTexts.some(ct => ct.includes(sub.toLowerCase())))
+    const subcatMatch = (() => {
+      // 개별 소분류 선택 시: 그 중 하나라도 포함되면 통과
+      if (selectedJobSubcats.length > 0) {
+        return selectedJobSubcats.some(sub => catTexts.some(ct => ct.includes(sub.toLowerCase())))
+      }
+      // '전체' 선택 또는 대분류만 선택 시: 해당 대분류의 모든 소분류 중 하나라도 포함되면 통과
+      if ((selectAllSubcats || selectedJobSubcats.length === 0) && selectedJobMainCd) {
+        const subs = (jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm.toLowerCase())) || []
+        if (subs.length > 0) {
+          return subs.some(s => catTexts.some(ct => ct.includes(s)))
+        }
+        // 소분류 목록을 아직 못 불러왔으면 대분류 이름으로 우선 매칭 시도
+        const main = jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm?.toLowerCase() || ''
+        return main ? catTexts.some(ct => ct.includes(main)) : true
+      }
+      // 카테고리 필터 미적용
+      return true
+    })()
     const barExcludedOk = excludeBar ? catTexts.every(ct => !ct.includes('bar')) : true
     const matchesCategory = subcatMatch && barExcludedOk
     return matchesSearch && matchesLocation && matchesLicense && matchesSuitability && matchesCategory
@@ -391,7 +407,7 @@ function CandidateSearch() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ fontSize: 12, color: '#999' }}>최대 5개까지 선택 가능</div>
                 <button
-                  onClick={() => { if (jobMainCats[0]) setSelectedJobMainCd(jobMainCats[0].cd); setSelectedJobSubcats([]); setExcludeBar(false) }}
+                  onClick={() => { setSelectedJobMainCd(''); setSelectedJobSubcats([]); setSelectAllSubcats(false); setExcludeBar(false) }}
                   style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
                 >
                   초기화
@@ -428,7 +444,8 @@ function CandidateSearch() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
                     {(jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm) || []).map(sub => {
-                      const selected = selectedJobSubcats.includes(sub)
+                      const isAll = sub === '전체'
+                      const selected = isAll ? selectAllSubcats : selectedJobSubcats.includes(sub)
                       return (
                         <label key={`${selectedJobMainCd}-${sub}`} style={{
                           display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
@@ -439,10 +456,17 @@ function CandidateSearch() {
                             type="checkbox"
                             checked={selected}
                             onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedJobSubcats(prev => prev.length >= 5 ? prev : [...prev, sub])
+                              if (isAll) {
+                                const next = e.target.checked
+                                setSelectAllSubcats(next)
+                                if (next) setSelectedJobSubcats([])
                               } else {
-                                setSelectedJobSubcats(prev => prev.filter(s => s !== sub))
+                                if (e.target.checked) {
+                                  if (selectAllSubcats) setSelectAllSubcats(false)
+                                  setSelectedJobSubcats(prev => prev.length >= 5 ? prev : [...prev, sub])
+                                } else {
+                                  setSelectedJobSubcats(prev => prev.filter(s => s !== sub))
+                                }
                               }
                             }}
                           />

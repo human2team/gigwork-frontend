@@ -37,6 +37,7 @@ interface CandidateProfile {
   workTime?: string;
   strengths?: string[];
   mbti?: string;
+  desiredCategories?: string[];
   licenses: License[];
   experiences: Experience[];
   height?: number;
@@ -171,6 +172,18 @@ export default function CandidateDetail() {
                     {profile.preferredRegion || '-'} {profile.preferredDistrict || ''} {profile.preferredDong || ''}
                   </div>
                 </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '8px' }}>희망 업직종</label>
+                <div style={{ fontSize: '16px', fontWeight: '500' }}>
+                  {Array.isArray(profile.desiredCategories) && profile.desiredCategories.length > 0
+                    ? (() => {
+                        const shown = profile.desiredCategories.slice(0, 3);
+                        const rest = profile.desiredCategories.length - shown.length;
+                        return shown.join(', ') + (rest > 0 ? ` 외 ${rest}개` : '');
+                      })()
+                    : '-'}
+                </div>
+              </div>
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '8px' }}>근무 기간</label>
                   <div style={{ fontSize: '16px', fontWeight: '500' }}>{profile.workDuration || '-'}</div>

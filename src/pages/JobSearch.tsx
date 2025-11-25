@@ -113,6 +113,7 @@ function JobSearch() {
   const [showJobPopup, setShowJobPopup] = useState(false)
   const [selectedJobMainCd, setSelectedJobMainCd] = useState<string>('') // 서버 카테고리 코드
   const [selectedJobSubcats, setSelectedJobSubcats] = useState<string[]>([])
+  const [selectAllSubcats, setSelectAllSubcats] = useState<boolean>(false)
   const [excludeBar, setExcludeBar] = useState(false)
   const [locationSearchQuery, setLocationSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -136,7 +137,8 @@ function JobSearch() {
         console.log('[categories] main ok:', data?.length)
         if (Array.isArray(data) && data.length > 0) {
           setJobMainCats(data)
-          setSelectedJobMainCd(data[0].cd)
+          // 초기화 시 기본 선택 없음
+          setSelectedJobMainCd('')
           return
         }
         console.warn('[categories] main empty')
@@ -292,9 +294,27 @@ function JobSearch() {
       const normalizedJob = (job.category || '').replace(/·/g, '.').toLowerCase()
       return normalizedSelected === normalizedJob
     })
-    const subcatMatch =
-      selectedJobSubcats.length === 0 ||
-      selectedJobSubcats.some(sub => (job.category || '').toLowerCase().includes(sub.toLowerCase()))
+    const subcatMatch = (() => {
+      const jobCat = (job.category || '').toLowerCase()
+      // 개별 소분류를 선택한 경우: 해당 소분류 중 하나와 일치해야 함
+      if (selectedJobSubcats.length > 0) {
+        return selectedJobSubcats.some(sub => jobCat.includes(sub.toLowerCase()))
+      }
+      // '전체' 토글이 켜졌거나, 소분류 선택이 없지만 대분류가 선택된 경우: 대분류 기준으로 즉시 적용
+      if ((selectAllSubcats || selectedJobSubcats.length === 0) && selectedJobMainCd) {
+        const subs = (jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm.toLowerCase())) || []
+        if (subs.length > 0) {
+          return subs.some(s => jobCat.includes(s))
+        }
+        // 소분류 목록이 아직 없으면 대분류 이름으로 즉시 매칭 시도
+        const mainName = getMainName(selectedJobMainCd).toLowerCase()
+        if (mainName) {
+          return jobCat.includes(mainName)
+        }
+      }
+      // 카테고리 필터 미적용
+      return true
+    })()
     const barExcluded = excludeBar ? !((job.category || '').toLowerCase().includes('bar')) : true
     const matchesCategory = baseCategoryMatch && subcatMatch && barExcluded
     
@@ -505,7 +525,7 @@ function JobSearch() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ fontSize: 12, color: '#999' }}>최대 5개까지 선택 가능</div>
                 <button
-                  onClick={() => { if (jobMainCats[0]) setSelectedJobMainCd(jobMainCats[0].cd); setSelectedJobSubcats([]); setExcludeBar(false) }}
+                  onClick={() => { setSelectedJobMainCd(''); setSelectedJobSubcats([]); setSelectAllSubcats(false); setExcludeBar(false) }}
                   style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
                 >
                   초기화
@@ -517,7 +537,7 @@ function JobSearch() {
                   {jobMainCats.map(main => (
                     <button
                       key={main.cd}
-                      onClick={() => { setSelectedJobMainCd(main.cd); ensureLoadSubCats(main.cd) }}
+                      onClick={() => { setSelectedJobMainCd(main.cd); setSelectAllSubcats(false); setSelectedJobSubcats([]); ensureLoadSubCats(main.cd) }}
                       style={{
                         width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
                         background: selectedJobMainCd === main.cd ? '#e3f2fd' : 'transparent',
@@ -542,7 +562,8 @@ function JobSearch() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
                     {(jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm) || []).map(sub => {
-                      const selected = selectedJobSubcats.includes(sub)
+                      const isAll = sub === '전체'
+                      const selected = isAll ? selectAllSubcats : selectedJobSubcats.includes(sub)
                       return (
                         <label key={`${selectedJobMainCd}-${sub}`} style={{
                           display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
@@ -553,10 +574,20 @@ function JobSearch() {
                             type="checkbox"
                             checked={selected}
                             onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedJobSubcats(prev => prev.length >= 5 ? prev : [...prev, sub])
+                              if (isAll) {
+                                // '전체' 토글
+                                const next = e.target.checked
+                                setSelectAllSubcats(next)
+                                if (next && selectedJobMainCd) ensureLoadSubCats(selectedJobMainCd)
+                                if (next) setSelectedJobSubcats([])
                               } else {
-                                setSelectedJobSubcats(prev => prev.filter(s => s !== sub))
+                                if (e.target.checked) {
+                                  // 개별 선택 시 '전체' 해제
+                                  if (selectAllSubcats) setSelectAllSubcats(false)
+                                  setSelectedJobSubcats(prev => prev.length >= 5 ? prev : [...prev, sub])
+                                } else {
+                                  setSelectedJobSubcats(prev => prev.filter(s => s !== sub))
+                                }
                               }
                             }}
                           />
