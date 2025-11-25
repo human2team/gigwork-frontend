@@ -111,16 +111,20 @@ export async function apiCall<T>(
     clearTimeout(timeoutId)
 
     if (error instanceof ApiException) {
+      console.error('[apiCall] ApiException:', error)
       throw error
     }
 
     if (error instanceof Error) {
       if (error.name === 'AbortError') {
+        console.error('[apiCall] 요청 시간이 초과되었습니다:', url)
         throw new ApiException('요청 시간이 초과되었습니다.', 408, 'Request Timeout')
       }
+      console.error('[apiCall] fetch 에러:', error)
       throw new ApiException(error.message, 0, 'Network Error')
     }
 
+    console.error('[apiCall] 알 수 없는 오류:', error)
     throw new ApiException('알 수 없는 오류가 발생했습니다.', 0, 'Unknown Error')
   }
 }

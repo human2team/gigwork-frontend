@@ -75,40 +75,53 @@ function EmployerJobEdit() {
     }
   }
 
-  // 시/도 및 구/군 데이터
-  const regions: Record<string, string[]> = {
-    '서울': ['강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'],
-    '부산': ['강서구', '금정구', '기장군', '남구', '동구', '동래구', '부산진구', '북구', '사상구', '사하구', '서구', '수영구', '연제구', '영도구', '중구', '해운대구'],
-    '대구': ['남구', '달서구', '달성군', '동구', '북구', '서구', '수성구', '중구'],
-    '인천': ['강화군', '계양구', '미추홀구', '남동구', '동구', '부평구', '서구', '연수구', '옹진군', '중구'],
-    '광주': ['광산구', '남구', '동구', '북구', '서구'],
-    '대전': ['대덕구', '동구', '서구', '유성구', '중구'],
-    '울산': ['남구', '동구', '북구', '울주군', '중구'],
-    '세종': ['세종시'],
-    '경기': ['가평군', '고양시', '과천시', '광명시', '광주시', '구리시', '군포시', '김포시', '남양주시', '동두천시', '부천시', '성남시', '수원시', '시흥시', '안산시', '안성시', '안양시', '양주시', '양평군', '여주시', '연천군', '오산시', '용인시', '의왕시', '의정부시', '이천시', '파주시', '평택시', '포천시', '하남시', '화성시'],
-    '강원': ['강릉시', '고성군', '동해시', '삼척시', '속초시', '양구군', '양양군', '영월군', '원주시', '인제군', '정선군', '철원군', '춘천시', '태백시', '평창군', '홍천군', '화천군', '횡성군'],
-    '충북': ['괴산군', '단양군', '보은군', '영동군', '옥천군', '음성군', '제천시', '증평군', '진천군', '청주시', '충주시'],
-    '충남': ['계룡시', '공주시', '금산군', '논산시', '당진시', '보령시', '부여군', '서산시', '서천군', '아산시', '예산군', '천안시', '청양군', '태안군', '홍성군'],
-    '전북': ['고창군', '군산시', '김제시', '남원시', '무주군', '부안군', '순창군', '완주군', '익산시', '임실군', '장수군', '전주시', '정읍시', '진안군'],
-    '전남': ['강진군', '고흥군', '곡성군', '광양시', '구례군', '나주시', '담양군', '목포시', '무안군', '보성군', '순천시', '신안군', '여수시', '영광군', '영암군', '완도군', '장성군', '장흥군', '진도군', '함평군', '해남군', '화순군'],
-    '경북': ['경산시', '경주시', '고령군', '구미시', '군위군', '김천시', '문경시', '봉화군', '상주시', '성주군', '안동시', '영덕군', '영양군', '영주시', '영천시', '예천군', '울릉군', '울진군', '의성군', '청도군', '청송군', '칠곡군', '포항시'],
-    '경남': ['거제시', '거창군', '고성군', '김해시', '남해군', '밀양시', '사천시', '산청군', '양산시', '의령군', '진주시', '진해시', '창녕군', '창원시', '통영시', '하동군', '함안군', '함양군', '합천군'],
-    '제주': ['서귀포시', '제주시']
-  }
+  // 지역 데이터 API 기반 동적 로딩
+  type RegionItem = { code: string; name: string }
+  type DistrictItem = { code: string; name: string }
+  type DongItem = { code: string; name: string }
+  const [regions, setRegions] = useState<RegionItem[]>([])
+  const [districts, setDistricts] = useState<DistrictItem[]>([])
+  const [dongs, setDongs] = useState<DongItem[]>([])
 
-  // 구/군별 동 데이터 (주요 구만 포함)
-  const districts: Record<string, string[]> = {
-    '서울 강남구': ['역삼동', '개포동', '논현동', '대치동', '도곡동', '삼성동', '세곡동', '수서동', '신사동', '압구정동', '일원동', '청담동'],
-    '서울 송파구': ['가락동', '거여동', '마천동', '문정동', '방이동', '삼전동', '석촌동', '송파동', '신천동', '오금동', '잠실동', '장지동', '풍납동'],
-    '서울 강서구': ['가양동', '공항동', '등촌동', '방화동', '염창동', '화곡동'],
-    '경기 성남시': ['금광동', '단대동', '복정동', '산성동', '수진동', '신촌동', '야탑동', '양지동', '은행동', '이매동', '정자동', '판교동', '하대원동', '하산운동'],
-    '경기 수원시': ['고등동', '곡반정동', '구운동', '권선동', '금곡동', '기산동', '매교동', '매산동', '매탄동', '영동', '영통동', '원천동', '이의동', '인계동', '장안동', '정자동', '조원동', '천천동', '팔달동', '하동', '호매실동']
-  }
+  // 시/도 불러오기
+  useEffect(() => {
+    fetch('/api/regions')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setRegions(data)
+      })
+      .catch(() => setRegions([]))
+  }, [])
 
-  const getDistricts = (region: string, district: string): string[] => {
-    const key = `${region} ${district}`
-    return districts[key] || []
-  }
+  // 구/군 불러오기
+  useEffect(() => {
+    if (!selectedRegion) return
+    const regionObj = regions.find(r => r.name === selectedRegion);
+    if (!regionObj) return;
+    fetch(`/api/districts?region=${encodeURIComponent(regionObj.code)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setDistricts(data)
+        else setDistricts([])
+      })
+      .catch(() => setDistricts([]))
+  }, [selectedRegion])
+
+  // 동 불러오기
+  useEffect(() => {
+    if (!selectedDistrict) return;
+    const districtObj = districts.find(d => d.name === selectedDistrict);
+    if (!districtObj) return;
+    fetch(`/api/dongs?district=${encodeURIComponent(districtObj.code)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) setDongs(data)
+        else setDongs([])
+      })
+      .catch(() => setDongs([]))
+  }, [selectedRegion, selectedDistrict])
+
+  // getDistricts 함수 제거, dongs 상태 사용
 
   const requirementOptions = [
     '통장사본',
@@ -654,35 +667,35 @@ function EmployerJobEdit() {
                 <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 320px', gap: 12 }}>
                   {/* 시/도 */}
                   <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
-                    {Object.keys(regions).map((region) => (
+                    {regions.map(region => (
                       <button
                         type="button"
-                        key={region}
-                        onClick={() => { handleRegionChange(region) }}
+                        key={region.code}
+                        onClick={() => { handleRegionChange(region.name) }}
                         style={{
                           width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
-                          background: selectedRegion === region ? '#e3f2fd' : 'transparent',
-                          color: selectedRegion === region ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                          background: selectedRegion === region.name ? '#e3f2fd' : 'transparent',
+                          color: selectedRegion === region.name ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
                         }}
                       >
-                        {region}
+                        {region.name}
                       </button>
                     ))}
                   </div>
                   {/* 구/군 */}
                   <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
-                    {selectedRegion && regions[selectedRegion]?.map(district => (
+                    {districts.map(district => (
                       <button
                         type="button"
-                        key={district}
-                        onClick={() => { handleDistrictChange(district) }}
+                        key={district.code}
+                        onClick={() => { handleDistrictChange(district.name) }}
                         style={{
                           width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
-                          background: selectedDistrict === district ? '#e3f2fd' : 'transparent',
-                          color: selectedDistrict === district ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                          background: selectedDistrict === district.name ? '#e3f2fd' : 'transparent',
+                          color: selectedDistrict === district.name ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
                         }}
                       >
-                        {district}
+                        {district.name}
                       </button>
                     ))}
                   </div>
@@ -690,10 +703,10 @@ function EmployerJobEdit() {
                   <div style={{ overflowY: 'auto', maxHeight: 220 }}>
                     {selectedDistrict ? (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
-                        {(getDistricts(selectedRegion, selectedDistrict).length > 0 ? getDistricts(selectedRegion, selectedDistrict) : ['전체']).map(dong => {
-                          const selected = (selectedDong || '') === (dong === '전체' ? '' : dong)
+                        {(dongs.length > 0 ? dongs : [{ code: '', name: '전체' }]).map(dong => {
+                          const selected = (selectedDong || '') === (dong.name === '전체' ? '' : dong.name)
                           return (
-                            <label key={dong} style={{
+                            <label key={dong.code || dong.name} style={{
                               display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
                               border: selected ? '1px solid #2196f3' : '1px solid #e0e0e0',
                               background: selected ? '#e3f2fd' : '#fff', borderRadius: 6, cursor: 'pointer'
@@ -702,9 +715,9 @@ function EmployerJobEdit() {
                                 type="radio"
                                 name="dong"
                                 checked={selected}
-                                onChange={() => { handleDongChange(dong === '전체' ? '' : dong) }}
+                                onChange={() => { handleDongChange(dong.name === '전체' ? '' : dong.name) }}
                               />
-                              <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{dong}</span>
+                              <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{dong.name}</span>
                             </label>
                           )
                         })}
