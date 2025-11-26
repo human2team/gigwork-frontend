@@ -29,7 +29,9 @@ function Sidebar() {
       }}
     >
       <nav>
-        {menuItems.map((item) => {
+        {menuItems
+          .filter(item => item.path !== '/jobseeker/recommendations')
+          .map((item) => {
           const Icon = item.icon
           const isActive = location.pathname === item.path
           return (

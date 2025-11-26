@@ -368,8 +368,14 @@ function EmployerSignup() {
               <input
                 type="checkbox"
                 checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                onChange={(e) => {
+                  // 본문 확인 없이 체크되지 않도록 차단
+                  if (!agreedToTerms) {
+                    window.open('/terms', '_blank', 'width=900,height=800')
+                  }
+                }}
                 style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                title="본문 확인 후 동의 시 자동 체크됩니다."
               />
               <span>
                 <a
@@ -394,8 +400,14 @@ function EmployerSignup() {
               <input
                 type="checkbox"
                 checked={agreedToPrivacy}
-                onChange={(e) => setAgreedToPrivacy(e.target.checked)}
+                onChange={(e) => {
+                  // 본문 확인 없이 체크되지 않도록 차단
+                  if (!agreedToPrivacy) {
+                    window.open('/privacy', '_blank', 'width=900,height=800')
+                  }
+                }}
                 style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                title="본문 확인 후 동의 시 자동 체크됩니다."
               />
               <span>
                 <a

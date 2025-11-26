@@ -17,6 +17,8 @@ type SavedJob = {
   description: string
   type: string
   posted: string
+  postingStatus?: string
+  deadline?: string
 }
 
 type AppliedJob = {
@@ -30,6 +32,8 @@ type AppliedJob = {
   type: string
   posted: string
   status: string
+  postingStatus?: string
+  deadline?: string
 }
 
 type License = {
@@ -47,6 +51,11 @@ type Experience = {
   endDate: string
   description: string
 }
+
+// 지역 선택을 OpenAPI로 가져오기 위한 타입
+type RegionItem = { code: string; name: string; sido?: string; sgg?: string; umd?: string }
+type DistrictItem = { code: string; name: string }
+type DongItem = { code: string; name: string }
 
 function Profile() {
   const { setJobseekerProfile } = useUser();
@@ -71,81 +80,7 @@ function Profile() {
     return Array.from(unique).slice(0, 3)
   }
   
-  // 시/도 및 구/군 데이터
-  const regions: Record<string, string[]> = {
-    '전체': ['전체'],
-    '서울': ['전체', '강남구', '강동구', '강북구', '강서구', '관악구', '광진구', '구로구', '금천구', '노원구', '도봉구', '동대문구', '동작구', '마포구', '서대문구', '서초구', '성동구', '성북구', '송파구', '양천구', '영등포구', '용산구', '은평구', '종로구', '중구', '중랑구'],
-    '부산': ['전체', '강서구', '금정구', '기장군', '남구', '동구', '동래구', '부산진구', '북구', '사상구', '사하구', '서구', '수영구', '연제구', '영도구', '중구', '해운대구'],
-    '대구': ['전체', '남구', '달서구', '달성군', '동구', '북구', '서구', '수성구', '중구'],
-    '인천': ['전체', '강화군', '계양구', '미추홀구', '남동구', '동구', '부평구', '서구', '연수구', '옹진군', '중구'],
-    '광주': ['전체', '광산구', '남구', '동구', '북구', '서구'],
-    '대전': ['전체', '대덕구', '동구', '서구', '유성구', '중구'],
-    '울산': ['전체', '남구', '동구', '북구', '울주군', '중구'],
-    '세종': ['전체'],
-    '경기': ['전체', '가평군', '고양시', '과천시', '광명시', '광주시', '구리시', '군포시', '김포시', '남양주시', '동두천시', '부천시', '성남시', '수원시', '시흥시', '안산시', '안성시', '안양시', '양주시', '양평군', '여주시', '연천군', '오산시', '용인시', '의왕시', '의정부시', '이천시', '파주시', '평택시', '포천시', '하남시', '화성시'],
-    '강원': ['전체', '강릉시', '고성군', '동해시', '삼척시', '속초시', '양구군', '양양군', '영월군', '원주시', '인제군', '정선군', '철원군', '춘천시', '태백시', '평창군', '홍천군', '화천군', '횡성군'],
-    '충북': ['전체', '괴산군', '단양군', '보은군', '영동군', '옥천군', '음성군', '제천시', '증평군', '진천군', '청주시', '충주시'],
-    '충남': ['전체', '계룡시', '공주시', '금산군', '논산시', '당진시', '보령시', '부여군', '서산시', '서천군', '아산시', '예산군', '천안시', '청양군', '태안군', '홍성군'],
-    '전북': ['전체', '고창군', '군산시', '김제시', '남원시', '무주군', '부안군', '순창군', '완주군', '익산시', '임실군', '장수군', '전주시', '정읍시', '진안군'],
-    '전남': ['전체', '강진군', '고흥군', '곡성군', '광양시', '구례군', '나주시', '담양군', '목포시', '무안군', '보성군', '순천시', '신안군', '여수시', '영광군', '영암군', '완도군', '장성군', '장흥군', '진도군', '함평군', '해남군', '화순군'],
-    '경북': ['전체', '경산시', '경주시', '고령군', '구미시', '군위군', '김천시', '문경시', '봉화군', '상주시', '성주군', '안동시', '영덕군', '영양군', '영주시', '영천시', '예천군', '울릉군', '울진군', '의성군', '청도군', '청송군', '칠곡군', '포항시'],
-    '경남': ['전체', '거제시', '거창군', '고성군', '김해시', '남해군', '밀양시', '사천시', '산청군', '양산시', '의령군', '진주시', '진해시', '창녕군', '창원시', '통영시', '하동군', '함안군', '함양군', '합천군'],
-    '제주': ['전체', '서귀포시', '제주시']
-  }
-
-  // 구/군별 동 데이터 (JobSearch.tsx와 동일한 데이터 사용)
-  const districts: Record<string, string[]> = {
-    // 서울 구의 동
-    '서울 강남구': ['전체', '역삼동', '개포동', '논현동', '대치동', '도곡동', '삼성동', '세곡동', '수서동', '신사동', '압구정동', '일원동', '청담동'],
-    '서울 강동구': ['전체', '강일동', '고덕동', '길동', '둔촌동', '명일동', '상일동', '성내동', '암사동', '천호동'],
-    '서울 강북구': ['전체', '미아동', '번동', '수유동', '우이동'],
-    '서울 강서구': ['전체', '가양동', '공항동', '등촌동', '방화동', '염창동', '화곡동'],
-    '서울 관악구': ['전체', '남현동', '봉천동', '신림동', '은천동', '인헌동', '청룡동', '행운동'],
-    '서울 광진구': ['전체', '광장동', '구의동', '군자동', '능동', '자양동', '화양동'],
-    '서울 구로구': ['전체', '가리봉동', '개봉동', '고척동', '구로동', '궁동', '신도림동', '오류동', '온수동', '천왕동', '항동'],
-    '서울 금천구': ['전체', '가산동', '독산동', '시흥동'],
-    '서울 노원구': ['전체', '공릉동', '상계동', '월계동', '중계동', '하계동'],
-    '서울 도봉구': ['전체', '도봉동', '방학동', '쌍문동', '창동'],
-    '서울 동대문구': ['전체', '답십리동', '용신동', '이문동', '장안동', '전농동', '제기동', '청량리동', '회기동', '휘경동'],
-    '서울 동작구': ['전체', '노량진동', '대방동', '사당동', '상도동', '신대방동', '흑석동'],
-    '서울 마포구': ['전체', '공덕동', '구수동', '노고산동', '당인동', '대흥동', '도화동', '망원동', '상암동', '상수동', '서강동', '서교동', '성산동', '신수동', '아현동', '연남동', '용강동', '합정동', '현석동'],
-    '서울 서대문구': ['전체', '남가좌동', '북가좌동', '냉천동', '대신동', '대현동', '미근동', '봉원동', '북아현동', '신촌동', '연희동', '영천동', '옥천동', '창천동', '천연동', '충현동', '합동', '현저동', '홍은동', '홍제동'],
-    '서울 서초구': ['전체', '내곡동', '반포동', '방배동', '서초동', '양재동', '염곡동', '우면동', '원지동', '잠원동'],
-    '서울 성동구': ['전체', '금호동', '도선동', '마장동', '사근동', '상왕십리동', '성수동', '송정동', '옥수동', '용신동', '응봉동', '하왕십리동', '행당동', '황학동'],
-    '서울 성북구': ['전체', '길음동', '돈암동', '동선동', '동소문동', '보문동', '삼선동', '상월곡동', '석관동', '성북동', '안암동', '장위동', '정릉동', '종암동', '하월곡동'],
-    '서울 송파구': ['전체', '가락동', '거여동', '마천동', '문정동', '방이동', '삼전동', '석촌동', '송파동', '신천동', '오금동', '잠실동', '장지동', '풍납동'],
-    '서울 양천구': ['전체', '목동', '신월동', '신정동'],
-    '서울 영등포구': ['전체', '당산동', '대림동', '도림동', '문래동', '신길동', '양평동', '여의도동', '영등포동', '용산동'],
-    '서울 용산구': ['전체', '갈월동', '남영동', '도원동', '동빙고동', '동자동', '문배동', '보광동', '산천동', '서빙고동', '서계동', '신계동', '신창동', '용산동', '원효로동', '이촌동', '이태원동', '주성동', '청파동', '한강로동', '한남동', '효창동', '후암동'],
-    '서울 은평구': ['전체', '갈현동', '구산동', '녹번동', '대조동', '불광동', '수색동', '신사동', '역촌동', '응암동', '증산동', '진관동'],
-    '서울 종로구': ['전체', '가회동', '견지동', '경운동', '계동', '공평동', '관수동', '관철동', '관훈동', '교남동', '교북동', '구기동', '궁정동', '권농동', '낙원동', '내수동', '내자동', '누하동', '당주동', '도렴동', '돈의동', '동숭동', '명륜동', '묘동', '무악동', '봉익동', '부암동', '사간동', '사직동', '삼청동', '서린동', '세종로', '소격동', '송월동', '송현동', '수송동', '숭인동', '신교동', '신문로', '신영동', '안국동', '연건동', '연지동', '예지동', '와룡동', '운니동', '원남동', '원서동', '이화동', '익선동', '인사동', '인의동', '장사동', '재동', '적선동', '종로동', '중학동', '창신동', '청와대로', '청진동', '체부동', '충신동', '통의동', '통인동', '팔판동', '평동', '평창동', '필운동', '행촌동', '혜화동', '화동', '효자동', '효제동', '훈정동'],
-    '서울 중구': ['전체', '광희동', '남대문로', '남산동', '남창동', '남학동', '다동', '만리동', '명동', '무교동', '무학동', '봉래동', '북창동', '산림동', '삼각동', '서소문동', '소공동', '수표동', '수하동', '순화동', '신당동', '쌍림동', '예장동', '오장동', '을지로동', '의주로', '인현동', '입정동', '장교동', '장충동', '저동', '정동', '주교동', '주자동', '중림동', '초동', '충무로', '충무로동', '태평로', '필동', '황학동', '회현동'],
-    '서울 중랑구': ['전체', '면목동', '묵동', '망우동', '상봉동', '신내동', '중화동'],
-    // 부산 구의 동 (주요 구만)
-    '부산 강서구': ['전체', '가락동', '강동동', '녹산동', '대저동', '명지동', '봉림동', '식만동', '신호동', '지사동', '천가동'],
-    '부산 해운대구': ['전체', '반송동', '반여동', '송정동', '우동', '재송동', '좌동', '중동'],
-    '부산 부산진구': ['전체', '가야동', '개금동', '당감동', '범천동', '범전동', '부암동', '부전동', '양정동', '연지동', '전포동', '초읍동', '초장동'],
-    // 대전 구의 동 (주요 구만)
-    '대전 유성구': ['전체', '갑동', '관평동', '구암동', '궁동', '노은동', '대정동', '덕명동', '도룡동', '봉명동', '상대동', '성북동', '신성동', '어은동', '원신흥동', '자운동', '장대동', '전민동', '지족동', '하기동', '학하동', '화암동'],
-    // 경기도 주요 도시의 동 (주요 시만)
-    '경기 성남시': ['전체', '금광동', '단대동', '복정동', '산성동', '수진동', '신촌동', '야탑동', '양지동', '은행동', '이매동', '정자동', '판교동', '하대원동', '하산운동'],
-    '경기 수원시': ['전체', '고등동', '곡반정동', '구운동', '권선동', '금곡동', '기산동', '매교동', '매산동', '매탄동', '영동', '영통동', '원천동', '이의동', '인계동', '장안동', '정자동', '조원동', '천천동', '팔달동', '하동', '호매실동'],
-    '경기 고양시': ['전체', '고양동', '관산동', '대자동', '덕이동', '마두동', '백석동', '삼송동', '성사동', '식사동', '신원동', '원당동', '주교동', '지축동', '행신동', '행주동', '화정동'],
-    '경기 용인시': ['전체', '고림동', '구갈동', '기흥동', '동백동', '마북동', '모현동', '보라동', '상하동', '서천동', '신갈동', '언남동', '영덕동', '죽전동', '지곡동', '포곡동', '해곡동', '호동'],
-    // 기타 시/군은 동 데이터가 없으면 동 선택 드롭다운이 표시되지 않음
-  }
-
-  // 구/군이 선택되지 않았거나 해당 구의 동 데이터가 없을 때
-  const getDistricts = (region: string, district: string): string[] => {
-    if (district === '전체') {
-      return ['전체']
-    }
-    const key = `${region} ${district}`
-    if (!districts[key]) {
-      return ['전체']
-    }
-    return districts[key] || ['전체']
-  }
+  // 하드코딩된 지역/동 데이터는 제거되었습니다. OpenAPI 기반 데이터 사용
 
   // 강점 옵션
   const strengthOptions = [
@@ -228,6 +163,37 @@ function Profile() {
   
   // 프로필 로딩 상태
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  // 급여 표시 보조 함수: 시급/일급/월급 접두 + $공백 제거
+  const formatSalaryLabel = (salary: any, salaryType?: any): string => {
+    const raw = String(salary ?? '').replace(/\$\s+/g, '$').trim()
+    const t = String(salaryType ?? '').toUpperCase()
+    const hasKoreanLabel = /시급|일급|월급|연봉/.test(raw)
+
+    const detectByType = (): string | '' => {
+      if (!t) return ''
+      if (t.includes('HOURLY') || t.includes('HOUR') || t.includes('시급')) return '시급'
+      if (t.includes('DAILY') || t.includes('DAY') || t.includes('일급')) return '일급'
+      if (t.includes('MONTH') || t.includes('MONTHLY') || t.includes('월급')) return '월급'
+      if (t.includes('YEAR') || t.includes('ANNUAL') || t.includes('연봉')) return '연봉'
+      return ''
+    }
+
+    const detectHeuristic = (): string | '' => {
+      // 급여 문자열에 한글 라벨이 없고 타입도 없을 때 숫자 범위로 추정
+      const num = parseInt(String(raw).replace(/[^0-9]/g, '') || '0', 10)
+      if (!Number.isFinite(num) || num <= 0) return ''
+      // 대략적 기준: < 100,000 시급, 100,000~999,999 일급, ≥ 1,000,000 월급
+      if (num >= 1_000_000) return '월급'
+      if (num >= 100_000) return '일급'
+      return '시급'
+    }
+
+    const label =
+      detectByType() ||
+      (hasKoreanLabel ? '' : detectHeuristic())
+
+    return label ? `${label} ${raw || '협의'}` : (raw || '협의')
+  }
   
   // 프로필 불러오기
   useEffect(() => {
@@ -302,11 +268,122 @@ function Profile() {
   const [showRegionDropdown, setShowRegionDropdown] = useState(false)
   const [showDistrictDropdown, setShowDistrictDropdown] = useState(false)
   const [showDongDropdown, setShowDongDropdown] = useState(false)
+  // OpenAPI 기반 지역 데이터 및 선택 코드
+  const [regionsApi, setRegionsApi] = useState<RegionItem[]>([])
+  const [districtsApi, setDistrictsApi] = useState<DistrictItem[]>([])
+  const [dongsApi, setDongsApi] = useState<DongItem[]>([])
+  const [selectedRegionCode, setSelectedRegionCode] = useState<string>('')
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState<string>('')
+  const [selectedDongCode, setSelectedDongCode] = useState<string>('')
   const [licenses, setLicenses] = useState<License[]>([])
   const [isLoadingLicenses, setIsLoadingLicenses] = useState(false)
   const [experience, setExperience] = useState<Experience[]>([])
   const [isLoadingExperiences, setIsLoadingExperiences] = useState(false)
+  const [activeJobIds, setActiveJobIds] = useState<number[]>([])
   
+  // 지역 API: 시/도 목록 로드
+  useEffect(() => {
+    const loadRegions = async () => {
+      try {
+        const res = await fetch('/api/regions')
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data)) {
+            const list = data.map((r: any) => ({
+              code: r.code,
+              name: r.name,
+              sido: r.sido,
+              sgg: r.sgg,
+              umd: r.umd
+            })) as RegionItem[]
+            setRegionsApi(list)
+          } else {
+            setRegionsApi([])
+          }
+        } else {
+          setRegionsApi([])
+        }
+      } catch {
+        setRegionsApi([])
+      }
+    }
+    loadRegions()
+  }, [])
+
+  // 선택된 시/도 코드에 따른 구/군 목록 로드
+  useEffect(() => {
+    if (!selectedRegionCode) {
+      setDistrictsApi([])
+      setSelectedDistrictCode('')
+      setDongsApi([])
+      setSelectedDongCode('')
+      return
+    }
+    const loadDistricts = async () => {
+      try {
+        const res = await fetch(`/api/districts?region=${encodeURIComponent(selectedRegionCode)}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data)) setDistrictsApi(data as DistrictItem[])
+          else setDistrictsApi([])
+        } else {
+          setDistrictsApi([])
+        }
+      } catch {
+        setDistrictsApi([])
+      }
+    }
+    loadDistricts()
+  }, [selectedRegionCode])
+
+  // 선택된 구/군 코드에 따른 동 목록 로드
+  useEffect(() => {
+    if (!selectedDistrictCode) {
+      setDongsApi([])
+      setSelectedDongCode('')
+      return
+    }
+    const loadDongs = async () => {
+      try {
+        const res = await fetch(`/api/dongs?district=${encodeURIComponent(selectedDistrictCode)}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data)) setDongsApi(data as DongItem[])
+          else setDongsApi([])
+        } else {
+          setDongsApi([])
+        }
+      } catch {
+        setDongsApi([])
+      }
+    }
+    loadDongs()
+  }, [selectedDistrictCode])
+
+  // 기존 저장된 personalInfo 값을 기반으로 초기 코드 매핑 시도
+  useEffect(() => {
+    // Region 초기 매핑
+    if (!selectedRegionCode && personalInfo.preferredRegion && personalInfo.preferredRegion !== '전체' && regionsApi.length > 0) {
+      const r = regionsApi.find(rg => rg.name === personalInfo.preferredRegion || rg.sido === personalInfo.preferredRegion)
+      if (r) setSelectedRegionCode(r.code)
+    }
+  }, [regionsApi, personalInfo.preferredRegion, selectedRegionCode])
+
+  useEffect(() => {
+    // District 초기 매핑
+    if (selectedRegionCode && !selectedDistrictCode && personalInfo.preferredDistrict && personalInfo.preferredDistrict !== '전체' && districtsApi.length > 0) {
+      const d = districtsApi.find(di => di.name === personalInfo.preferredDistrict)
+      if (d) setSelectedDistrictCode(d.code)
+    }
+  }, [districtsApi, personalInfo.preferredDistrict, selectedRegionCode, selectedDistrictCode])
+
+  useEffect(() => {
+    // Dong 초기 매핑
+    if (selectedDistrictCode && !selectedDongCode && personalInfo.preferredDong && personalInfo.preferredDong !== '전체' && dongsApi.length > 0) {
+      const dd = dongsApi.find(dg => dg.name === personalInfo.preferredDong)
+      if (dd) setSelectedDongCode(dd.code)
+    }
+  }, [dongsApi, personalInfo.preferredDong, selectedDistrictCode, selectedDongCode])
   // 자격증 로드
   useEffect(() => {
     const loadLicenses = async () => {
@@ -807,6 +884,19 @@ function Profile() {
     if (diffDays < 30) return `${Math.floor(diffDays / 7)}주전`
     return `${Math.floor(diffDays / 30)}개월전`
   }
+  
+  // 공고 마감 여부
+  const isJobClosed = (status?: string, deadline?: string): boolean => {
+    const s = String(status || '').trim().toLowerCase()
+    if (s && (s === 'closed' || s.includes('마감') || s.includes('종료') || s.includes('마감됨'))) return true
+    if (!deadline) return false
+    const d = new Date(deadline)
+    if (isNaN(d.getTime())) return false
+    const today = new Date()
+    d.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+    return d < today
+  }
 
   // 저장된 일자리 불러오기 (API 연동)
   useEffect(() => {
@@ -830,9 +920,13 @@ function Profile() {
               company: job.company || '',
               location: job.location || '',
               salary: job.salary || '협의',
+              salaryType: job.salaryType || job.salary_type || null,
               description: job.description || '',
               type: job.jobType || '파트타임',
-              posted: job.postedDate ? getDaysAgo(job.postedDate) : '최근'
+              posted: job.postedDate ? getDaysAgo(job.postedDate) : '최근',
+              // 가능한 키를 폭넓게 수용
+              postingStatus: job.status || job.jobStatus || job.postingStatus || job.job_post_status || job.post_status || null,
+              deadline: job.deadline || job.jobDeadline || job.job_deadline || job.deadlineDate || job.job_deadline_date || null
             }))
             console.log('✅ 저장된 일자리 개수:', formattedJobs.length, formattedJobs)
             setSavedJobs(formattedJobs)
@@ -873,20 +967,63 @@ function Profile() {
     const fetchApplications = async () => {
       try {
         const response = await apiCall(`/api/jobseeker/applications/${userId}`, { method: 'GET' })
-        if (Array.isArray(response)) {
-          const formattedJobs = response.map((app: any) => ({
+          if (Array.isArray(response)) {
+            const formattedJobs = response.map((app: any) => ({
             id: app.jobId,
             applicationId: app.id, // 지원서 ID (삭제용)
             title: app.jobTitle,
             company: app.company || '',
             location: app.location || '',
             salary: app.salary || '협의',
+            salaryType: app.salaryType || app.salary_type || null,
             description: app.description || '',
             type: app.jobType || '파트타임',
             posted: app.posted || '최근',
-            status: app.status || 'PENDING'
+            status: app.status || 'PENDING',
+            // 공고 상태 키 확장 + 앱 상태가 '마감/종료' 의미일 경우도 수용
+            postingStatus: app.jobStatus || app.postingStatus || app.job_status || app.job_post_status || app.post_status
+              || (app.job ? (app.job.status || app.job.jobStatus || app.job.postingStatus || app.job.job_status || app.job.post_status) : null)
+              || (typeof app.status === 'string' ? app.status : null),
+            deadline: app.deadline || app.jobDeadline || app.job_deadline || app.deadlineDate || app.job_deadline_date
+              || (app.job ? (app.job.deadline || app.job.jobDeadline || app.job.job_deadline || app.job.deadlineDate || app.job.job_deadline_date) : null)
+              || null
           }))
-          setAppliedJobs(formattedJobs)
+          // 상세 정보로 마감 보강 (필드가 비어있는 항목만)
+          const enrichWithDetails = async (jobsArr: AppliedJob[]) => {
+            return await Promise.all(jobsArr.map(async (j) => {
+              if (j.postingStatus || j.deadline) return j
+              try {
+                // 구직자 상세 API 우선 시도
+                let res = await fetch(`/api/jobs/detail/${j.id}`)
+                if (!res.ok) {
+                  // 실패 시 고용주 상세 API로 폴백
+                  res = await fetch(`/api/employer/jobs/detail/${j.id}`)
+                }
+                if (res.ok) {
+                  const data = await res.json()
+                  const postingStatus = data.status || data.jobStatus || data.postingStatus || null
+                  const deadline = data.deadline || data.jobDeadline || data.job_deadline || null
+                  return { ...j, postingStatus, deadline }
+                }
+              } catch {
+                // ignore
+              }
+              return j
+            }))
+          }
+          const enriched = await enrichWithDetails(formattedJobs as AppliedJob[])
+          setAppliedJobs(enriched)
+          // 활성 공고 ID 목록 로드(없으면 마감으로 간주하는 보강 로직)
+          try {
+            const actRes = await fetch('/api/jobs/active')
+            if (actRes.ok) {
+              const act = await actRes.json()
+              if (Array.isArray(act)) {
+                const ids = act.map((j: any) => Number(j.id)).filter((v: any) => Number.isFinite(v))
+                setActiveJobIds(ids)
+              }
+            }
+          } catch {}
         }
       } catch (error) {
         console.error('지원 내역을 불러오는데 실패했습니다:', error)
@@ -1103,7 +1240,7 @@ function Profile() {
                 <option value="여성">여성</option>
               </select>
             </div>
-            <div style={{ gridColumn: '1 / -1' }}>
+            <div>
               <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Home size={16} color="#607d8b" />
                 주소
@@ -1133,27 +1270,48 @@ function Profile() {
               <GraduationCap size={20} />
               학력사항
             </h3>
-            <div style={{ maxWidth: '800px' }}>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>최종학력</label>
-              <select
-                value={personalInfo.education}
-                onChange={(e) => setPersonalInfo({ ...personalInfo, education: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  fontSize: '16px'
-                }}
-              >
-                <option value="">선택하세요</option>
-                <option value="초등학교">초등학교</option>
-                <option value="중학교">중학교</option>
-                <option value="고등학교">고등학교</option>
-                <option value="대학(2,3년제)">대학(2,3년제)</option>
-                <option value="대학(4년제)">대학(4년제)</option>
-                <option value="대학원">대학원</option>
-              </select>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '800px' }}>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>최종학력</label>
+                <select
+                  value={personalInfo.education}
+                  onChange={(e) => setPersonalInfo({ ...personalInfo, education: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '16px'
+                  }}
+                >
+                  <option value="">선택하세요</option>
+                  <option value="초등학교">초등학교</option>
+                  <option value="중학교">중학교</option>
+                  <option value="고등학교">고등학교</option>
+                  <option value="대학(2,3년제)">대학(2,3년제)</option>
+                  <option value="대학(4년제)">대학(4년제)</option>
+                  <option value="대학원">대학원</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>나의 MBTI</label>
+                <select
+                  value={personalInfo.mbti}
+                  onChange={(e) => setPersonalInfo({ ...personalInfo, mbti: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    fontSize: '16px'
+                  }}
+                >
+                  <option value="">선택하세요</option>
+                  {mbtiOptions.map((mbti) => (
+                    <option key={mbti} value={mbti}>{mbti}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -1163,7 +1321,7 @@ function Profile() {
               <Briefcase size={20} color="#2196f3" />
               희망근무조건
             </h3>
-            <div style={{ marginBottom: '24px' }}>
+              <div style={{ marginBottom: '24px' }}>
               <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>지역선택</h4>
               <div style={{ display: 'flex', gap: '12px', maxWidth: '800px' }}>
                 {/* 시/도 선택 */}
@@ -1190,7 +1348,7 @@ function Profile() {
                       fontSize: '16px'
                     }}
                   >
-                    <span>{personalInfo.preferredRegion}</span>
+                      <span>{personalInfo.preferredRegion || '전체'}</span>
                     <ChevronDown size={20} color="#666" />
                   </button>
                   {showRegionDropdown && (
@@ -1208,18 +1366,20 @@ function Profile() {
                       maxHeight: '300px',
                       overflowY: 'auto'
                     }}>
-                      {Object.keys(regions).map((region) => (
+                        {/* 전체 */}
                         <button
-                          key={region}
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setPersonalInfo({ 
-                              ...personalInfo, 
-                              preferredRegion: region,
+                            setPersonalInfo({
+                              ...personalInfo,
+                              preferredRegion: '전체',
                               preferredDistrict: '전체',
                               preferredDong: '전체'
                             })
+                            setSelectedRegionCode('')
+                            setSelectedDistrictCode('')
+                            setSelectedDongCode('')
                             setShowRegionDropdown(false)
                           }}
                           style={{
@@ -1227,32 +1387,51 @@ function Profile() {
                             padding: '12px 16px',
                             textAlign: 'left',
                             border: 'none',
-                            backgroundColor: personalInfo.preferredRegion === region ? '#e3f2fd' : '#ffffff',
-                            color: personalInfo.preferredRegion === region ? '#2196f3' : '#333',
+                            backgroundColor: personalInfo.preferredRegion === '전체' ? '#e3f2fd' : '#ffffff',
+                            color: personalInfo.preferredRegion === '전체' ? '#2196f3' : '#333',
                             cursor: 'pointer',
-                            fontSize: '16px',
-                            transition: 'background-color 0.2s'
-                          }}
-                          onMouseEnter={(e) => {
-                            if (personalInfo.preferredRegion !== region) {
-                              e.currentTarget.style.backgroundColor = '#f5f5f5'
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (personalInfo.preferredRegion !== region) {
-                              e.currentTarget.style.backgroundColor = '#ffffff'
-                            }
+                            fontSize: '16px'
                           }}
                         >
-                          {region}
+                          전체
                         </button>
-                      ))}
+                        {regionsApi.map((region) => (
+                          <button
+                            key={region.code}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setPersonalInfo({ 
+                                ...personalInfo, 
+                                preferredRegion: region.name,
+                                preferredDistrict: '전체',
+                                preferredDong: '전체'
+                              })
+                              setSelectedRegionCode(region.code)
+                              setSelectedDistrictCode('')
+                              setSelectedDongCode('')
+                              setShowRegionDropdown(false)
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '12px 16px',
+                              textAlign: 'left',
+                              border: 'none',
+                              backgroundColor: personalInfo.preferredRegion === region.name ? '#e3f2fd' : '#ffffff',
+                              color: personalInfo.preferredRegion === region.name ? '#2196f3' : '#333',
+                              cursor: 'pointer',
+                              fontSize: '16px'
+                            }}
+                          >
+                            {region.name}
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>
 
                 {/* 구/군 선택 */}
-                {personalInfo.preferredRegion !== '전체' && (
+                  {selectedRegionCode && (
                   <div style={{ position: 'relative', flex: 1 }} data-district-dropdown>
                     <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>구/군</label>
                     <button
@@ -1276,7 +1455,7 @@ function Profile() {
                         fontSize: '16px'
                       }}
                     >
-                      <span>{personalInfo.preferredDistrict}</span>
+                      <span>{personalInfo.preferredDistrict || '전체'}</span>
                       <ChevronDown size={20} color="#666" />
                     </button>
                     {showDistrictDropdown && (
@@ -1294,17 +1473,18 @@ function Profile() {
                         maxHeight: '300px',
                         overflowY: 'auto'
                       }}>
-                        {regions[personalInfo.preferredRegion]?.map((district) => (
+                          {/* 전체 */}
                           <button
-                            key={district}
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setPersonalInfo({ 
-                                ...personalInfo, 
-                                preferredDistrict: district,
+                              setPersonalInfo({
+                                ...personalInfo,
+                                preferredDistrict: '전체',
                                 preferredDong: '전체'
                               })
+                              setSelectedDistrictCode('')
+                              setSelectedDongCode('')
                               setShowDistrictDropdown(false)
                             }}
                             style={{
@@ -1312,35 +1492,50 @@ function Profile() {
                               padding: '12px 16px',
                               textAlign: 'left',
                               border: 'none',
-                              backgroundColor: personalInfo.preferredDistrict === district ? '#e3f2fd' : '#ffffff',
-                              color: personalInfo.preferredDistrict === district ? '#2196f3' : '#333',
+                              backgroundColor: personalInfo.preferredDistrict === '전체' ? '#e3f2fd' : '#ffffff',
+                              color: personalInfo.preferredDistrict === '전체' ? '#2196f3' : '#333',
                               cursor: 'pointer',
-                              fontSize: '16px',
-                              transition: 'background-color 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (personalInfo.preferredDistrict !== district) {
-                                e.currentTarget.style.backgroundColor = '#f5f5f5'
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (personalInfo.preferredDistrict !== district) {
-                                e.currentTarget.style.backgroundColor = '#ffffff'
-                              }
+                              fontSize: '16px'
                             }}
                           >
-                            {district}
+                            전체
                           </button>
-                        ))}
+                          {districtsApi.map((district) => (
+                            <button
+                              key={district.code}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setPersonalInfo({ 
+                                  ...personalInfo, 
+                                  preferredDistrict: district.name,
+                                  preferredDong: '전체'
+                                })
+                                setSelectedDistrictCode(district.code)
+                                setSelectedDongCode('')
+                                setShowDistrictDropdown(false)
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '12px 16px',
+                                textAlign: 'left',
+                                border: 'none',
+                                backgroundColor: personalInfo.preferredDistrict === district.name ? '#e3f2fd' : '#ffffff',
+                                color: personalInfo.preferredDistrict === district.name ? '#2196f3' : '#333',
+                                cursor: 'pointer',
+                                fontSize: '16px'
+                              }}
+                            >
+                              {district.name}
+                            </button>
+                          ))}
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* 동 선택 */}
-                {personalInfo.preferredRegion !== '전체' && 
-                 personalInfo.preferredDistrict !== '전체' && 
-                 getDistricts(personalInfo.preferredRegion, personalInfo.preferredDistrict).length > 1 && (
+                  {selectedRegionCode && selectedDistrictCode && (
                   <div style={{ position: 'relative', flex: 1 }} data-dong-dropdown>
                     <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>동</label>
                     <button
@@ -1364,7 +1559,7 @@ function Profile() {
                         fontSize: '16px'
                       }}
                     >
-                      <span>{personalInfo.preferredDong}</span>
+                      <span>{personalInfo.preferredDong || '전체'}</span>
                       <ChevronDown size={20} color="#666" />
                     </button>
                     {showDongDropdown && (
@@ -1382,16 +1577,16 @@ function Profile() {
                         maxHeight: '300px',
                         overflowY: 'auto'
                       }}>
-                        {getDistricts(personalInfo.preferredRegion, personalInfo.preferredDistrict).map((dong) => (
+                          {/* 전체 */}
                           <button
-                            key={dong}
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
                               setPersonalInfo({ 
                                 ...personalInfo, 
-                                preferredDong: dong
+                                preferredDong: '전체'
                               })
+                              setSelectedDongCode('')
                               setShowDongDropdown(false)
                             }}
                             style={{
@@ -1399,26 +1594,41 @@ function Profile() {
                               padding: '12px 16px',
                               textAlign: 'left',
                               border: 'none',
-                              backgroundColor: personalInfo.preferredDong === dong ? '#e3f2fd' : '#ffffff',
-                              color: personalInfo.preferredDong === dong ? '#2196f3' : '#333',
+                              backgroundColor: personalInfo.preferredDong === '전체' ? '#e3f2fd' : '#ffffff',
+                              color: personalInfo.preferredDong === '전체' ? '#2196f3' : '#333',
                               cursor: 'pointer',
-                              fontSize: '16px',
-                              transition: 'background-color 0.2s'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (personalInfo.preferredDong !== dong) {
-                                e.currentTarget.style.backgroundColor = '#f5f5f5'
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (personalInfo.preferredDong !== dong) {
-                                e.currentTarget.style.backgroundColor = '#ffffff'
-                              }
+                              fontSize: '16px'
                             }}
                           >
-                            {dong}
+                            전체
                           </button>
-                        ))}
+                          {dongsApi.map((dong) => (
+                            <button
+                              key={dong.code}
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setPersonalInfo({ 
+                                  ...personalInfo, 
+                                  preferredDong: dong.name
+                                })
+                                setSelectedDongCode(dong.code)
+                                setShowDongDropdown(false)
+                              }}
+                              style={{
+                                width: '100%',
+                                padding: '12px 16px',
+                                textAlign: 'left',
+                                border: 'none',
+                                backgroundColor: personalInfo.preferredDong === dong.name ? '#e3f2fd' : '#ffffff',
+                                color: personalInfo.preferredDong === dong.name ? '#2196f3' : '#333',
+                                cursor: 'pointer',
+                                fontSize: '16px'
+                              }}
+                            >
+                              {dong.name}
+                            </button>
+                          ))}
                       </div>
                     )}
                   </div>
@@ -1669,28 +1879,7 @@ function Profile() {
             </div>
           </div>
 
-          {/* 나의 MBTI */}
-          <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e0e0e0' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>나의 MBTI</h3>
-            <div style={{ maxWidth: '800px' }}>
-              <select
-                value={personalInfo.mbti}
-                onChange={(e) => setPersonalInfo({ ...personalInfo, mbti: e.target.value })}
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  fontSize: '16px'
-                }}
-              >
-                <option value="">선택하세요</option>
-                {mbtiOptions.map((mbti) => (
-                  <option key={mbti} value={mbti}>{mbti}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+
 
           {/* 자기소개 */}
           <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e0e0e0' }}>
@@ -2608,6 +2797,16 @@ function Profile() {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                           <h3 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>{job.title}</h3>
+                          {isJobClosed((job as any).postingStatus, (job as any).deadline) && (
+                            <span style={{
+                              padding: '4px 12px',
+                              backgroundColor: '#ffebee',
+                              color: '#d32f2f',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>마감</span>
+                          )}
                           {(applicationStatus === '합격' || applicationStatus === 'ACCEPTED') && (
                             <span style={{
                               padding: '4px 12px',
@@ -2647,7 +2846,7 @@ function Profile() {
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <DollarSign size={16} />
-                            {job.salary}
+                            {formatSalaryLabel((job as any).salary, (job as any).salaryType || (job as any).salary_type)}
                           </span>
                         </div>
                         <p style={{ color: '#666', fontSize: '14px', marginBottom: '12px' }}>{job.description}</p>
@@ -2758,6 +2957,19 @@ function Profile() {
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <h3 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>{job.title}</h3>
+                        {(
+                          isJobClosed((job as any).postingStatus, (job as any).deadline) ||
+                          (activeJobIds.length > 0 && !activeJobIds.includes((job as any).id))
+                        ) && (
+                          <span style={{
+                            padding: '4px 12px',
+                            backgroundColor: '#ffebee',
+                            color: '#d32f2f',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}>마감</span>
+                        )}
                         {(job.status === '합격' || job.status === 'ACCEPTED') && (
                           <span style={{
                             padding: '4px 12px',
@@ -2795,9 +3007,9 @@ function Profile() {
                           <MapPin size={16} />
                           {job.location}
                         </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <DollarSign size={16} />
-                          {job.salary}
+                           {formatSalaryLabel((job as any).salary, (job as any).salaryType || (job as any).salary_type)}
                         </span>
                       </div>
                       <p style={{ color: '#666', fontSize: '14px', marginBottom: '12px' }}>{job.description}</p>
