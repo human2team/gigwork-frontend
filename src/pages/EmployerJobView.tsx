@@ -9,6 +9,16 @@ function EmployerJobView() {
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
 
+  const isPastDeadline = (deadline?: string) => {
+    if (!deadline) return false
+    const d = new Date(deadline)
+    if (isNaN(d.getTime())) return false
+    const today = new Date()
+    d.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+    return d.getTime() < today.getTime()
+  }
+
   useEffect(() => {
     const fetchJobDetail = async () => {
       try {
@@ -56,6 +66,12 @@ function EmployerJobView() {
     
     const currentStatus = job.status
     const newStatus = currentStatus === '진행중' ? 'CLOSED' : 'ACTIVE'
+
+    // 재개 시 마감일 경과 여부 체크
+    if (newStatus === 'ACTIVE' && isPastDeadline(job.deadline)) {
+      alert('마감일이 지난 공고는 재개할 수 없습니다.\n수정 화면에서 마감일을 변경한 후 재개해 주세요.')
+      return
+    }
     const confirmMessage = currentStatus === '진행중' 
       ? '공고를 마감하시겠습니까? 마감 후에는 구직자들이 지원할 수 없습니다.'
       : '공고를 다시 진행 상태로 변경하시겠습니까?'
@@ -334,17 +350,17 @@ function EmployerJobView() {
             </h2>
             <button
               onClick={handleStatusToggle}
-              disabled={updating}
+              disabled={updating || (job.status !== '진행중' && isPastDeadline(job.deadline))}
               style={{
                 padding: '8px 16px',
                 border: job.status === '진행중' ? '1px solid #f44336' : '1px solid #4caf50',
                 borderRadius: '6px',
                 backgroundColor: '#ffffff',
                 color: job.status === '진행중' ? '#f44336' : '#4caf50',
-                cursor: updating ? 'not-allowed' : 'pointer',
+                cursor: (updating || (job.status !== '진행중' && isPastDeadline(job.deadline))) ? 'not-allowed' : 'pointer',
                 fontSize: '14px',
                 fontWeight: '500',
-                opacity: updating ? 0.6 : 1
+                opacity: (updating || (job.status !== '진행중' && isPastDeadline(job.deadline))) ? 0.6 : 1
               }}
             >
               {updating ? '처리중...' : (job.status === '진행중' ? '공고 마감하기' : '공고 재개하기')}

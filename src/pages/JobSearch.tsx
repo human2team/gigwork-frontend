@@ -8,10 +8,22 @@ const getDaysAgo = (dateString: string): string => {
   if (!dateString) return '최근'
   const now = new Date()
   const d = new Date(dateString)
+  if (isNaN(d.getTime())) return '최근'
   const ms = now.getTime() - d.getTime()
   const minutes = Math.floor(ms / (1000 * 60))
   const hours = Math.floor(ms / (1000 * 60 * 60))
   const days = Math.floor(ms / (1000 * 60 * 60 * 24))
+
+  // 같은 날짜에 등록된 항목은 시간대 차이로 인한 혼동을 줄이기 위해 '최근'으로 처리
+  const sameDay = (() => {
+    const dn = new Date(d)
+    const nn = new Date(now)
+    dn.setHours(0, 0, 0, 0)
+    nn.setHours(0, 0, 0, 0)
+    return dn.getTime() === nn.getTime()
+  })()
+  if (sameDay && hours < 6) return minutes < 1 ? '방금 전' : '최근'
+
   if (minutes < 1) return '방금 전'
   if (minutes < 60) return `${minutes}분 전`
   if (hours < 24) return `${hours}시간 전`
@@ -146,10 +158,11 @@ function JobSearch() {
   const [showJobPopup, setShowJobPopup] = useState(false)
   const [selectedJobMainCd, setSelectedJobMainCd] = useState<string>('') // 서버 카테고리 코드
   const [selectedJobSubcats, setSelectedJobSubcats] = useState<string[]>([])
+  const [selectAllSubcats, setSelectAllSubcats] = useState<boolean>(false)
   const [excludeBar, setExcludeBar] = useState(false)
   const [locationSearchQuery, setLocationSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const PER_PAGE = 9
+  const PER_PAGE = 10
   // 서버 카테고리 상태
   const [jobMainCats, setJobMainCats] = useState<CategoryItem[]>([])
   const [jobSubCatsByMain, setJobSubCatsByMain] = useState<Record<string, CategoryItem[]>>({})
@@ -169,7 +182,8 @@ function JobSearch() {
         console.log('[categories] main ok:', data?.length)
         if (Array.isArray(data) && data.length > 0) {
           setJobMainCats(data)
-          setSelectedJobMainCd(data[0].cd)
+          // 초기화 시 기본 선택 없음
+          setSelectedJobMainCd('')
           return
         }
         console.warn('[categories] main empty')
@@ -295,10 +309,17 @@ function JobSearch() {
 
   // 필터링된 일자리
   const filteredJobs = jobs.filter(job => {
-    const matchesSearch = searchQuery === '' || 
-      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchQuery.toLowerCase());
+    // 검색: 구직제목, 지역(근무지), 업직종 카테고리
+    const q = searchQuery.trim().toLowerCase()
+    const qDot = q.replace(/·/g, '.')
+    const titleNorm = (job.title || '').toLowerCase()
+    const locationNorm = (job.location || '').toLowerCase()
+    const categoryNorm = (job.category || '').toLowerCase().replace(/·/g, '.')
+    const matchesSearch =
+      q === '' ||
+      titleNorm.includes(q) ||
+      locationNorm.includes(q) ||
+      categoryNorm.includes(qDot);
 
     // 지역명 기반 필터링
     let matchesLocation = true;
@@ -318,18 +339,36 @@ function JobSearch() {
     }
 
     const baseCategoryMatch = selectedCategories.length === 0 || selectedCategories.some(selectedCat => {
-      const normalizedSelected = selectedCat.replace(/·/g, '.').toLowerCase();
-      const normalizedJob = (job.category || '').replace(/·/g, '.').toLowerCase();
-      return normalizedSelected === normalizedJob;
-    });
-    const subcatMatch =
-      selectedJobSubcats.length === 0 ||
-      selectedJobSubcats.some(sub => (job.category || '').toLowerCase().includes(sub.toLowerCase()));
-    const barExcluded = excludeBar ? !((job.category || '').toLowerCase().includes('bar')) : true;
-    const matchesCategory = baseCategoryMatch && subcatMatch && barExcluded;
-
-    return matchesSearch && matchesLocation && matchesCategory;
-  });
+      const normalizedSelected = selectedCat.replace(/·/g, '.').toLowerCase()
+      const normalizedJob = (job.category || '').replace(/·/g, '.').toLowerCase()
+      return normalizedSelected === normalizedJob
+    })
+    const subcatMatch = (() => {
+      const jobCat = (job.category || '').toLowerCase()
+      // 개별 소분류를 선택한 경우: 해당 소분류 중 하나와 일치해야 함
+      if (selectedJobSubcats.length > 0) {
+        return selectedJobSubcats.some(sub => jobCat.includes(sub.toLowerCase()))
+      }
+      // '전체' 토글이 켜졌거나, 소분류 선택이 없지만 대분류가 선택된 경우: 대분류 기준으로 즉시 적용
+      if ((selectAllSubcats || selectedJobSubcats.length === 0) && selectedJobMainCd) {
+        const subs = (jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm.toLowerCase())) || []
+        if (subs.length > 0) {
+          return subs.some(s => jobCat.includes(s))
+        }
+        // 소분류 목록이 아직 없으면 대분류 이름으로 즉시 매칭 시도
+        const mainName = getMainName(selectedJobMainCd).toLowerCase()
+        if (mainName) {
+          return jobCat.includes(mainName)
+        }
+      }
+      // 카테고리 필터 미적용
+      return true
+    })()
+    const barExcluded = excludeBar ? !((job.category || '').toLowerCase().includes('bar')) : true
+    const matchesCategory = baseCategoryMatch && subcatMatch && barExcluded
+    
+    return matchesSearch && matchesLocation && matchesCategory
+  })
 
   // 페이지네이션 계산
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PER_PAGE))
@@ -372,7 +411,13 @@ function JobSearch() {
               gap: 6
             }}
           >
-            지역
+          {(() => {
+            const r = regions.find(r => r.code === selectedRegionCode)?.name || ''
+            const d = districts.find(d => d.code === selectedDistrictCode)?.name || ''
+            const g = dongs.find(dd => dd.code === selectedDongCode)?.name || ''
+            const label = [r, d, g].filter(Boolean).join(' ')
+            return label || '지역'
+          })()}
             <ChevronDown size={16} />
           </button>
           {showRegionPopup && (
@@ -380,7 +425,7 @@ function JobSearch() {
               position: 'absolute',
               top: 'calc(100% + 8px)',
               left: 0,
-              width: 760,
+              width: 'min(760px, calc(100vw - 32px))',
               backgroundColor: '#fff',
               border: '1px solid #e0e0e0',
               borderRadius: 8,
@@ -395,7 +440,7 @@ function JobSearch() {
                   style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
                 >초기화</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 320px', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 1fr', gap: 12 }}>
                 {/* 시/도 */}
                 <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
                   {filteredRegions.map(region => (
@@ -445,7 +490,7 @@ function JobSearch() {
                   ))}
                 </div>
                 {/* 동 */}
-                <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                <div style={{ overflowY: 'auto', overflowX: 'hidden', maxHeight: 220, minWidth: 0 }}>
                   {dongs.map(dong => (
                     <label key={dong.code} style={{
                       display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
@@ -494,7 +539,18 @@ function JobSearch() {
               gap: 6
             }}
           >
-            업직종{selectedJobSubcats.length > 0 ? `(${selectedJobSubcats.length})` : ''}
+          {(() => {
+            const mainNm = (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm) || ''
+            let display = ''
+            if (selectedJobSubcats.length > 0) {
+              display = `${selectedJobSubcats.slice(0, 2).join(', ')}${selectedJobSubcats.length > 2 ? ` 외 ${selectedJobSubcats.length - 2}개` : ''}`
+            } else if (selectAllSubcats && mainNm) {
+              display = mainNm
+            } else if (selectedJobMainCd && mainNm) {
+              display = mainNm
+            }
+            return display || '업직종'
+          })()}
             <ChevronDown size={16} />
           </button>
           {showJobPopup && (
@@ -513,7 +569,7 @@ function JobSearch() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                 <div style={{ fontSize: 12, color: '#999' }}>최대 5개까지 선택 가능</div>
                 <button
-                  onClick={() => { if (jobMainCats[0]) setSelectedJobMainCd(jobMainCats[0].cd); setSelectedJobSubcats([]); setExcludeBar(false) }}
+                  onClick={() => { setSelectedJobMainCd(''); setSelectedJobSubcats([]); setSelectAllSubcats(false); setExcludeBar(false) }}
                   style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
                 >
                   초기화
@@ -525,7 +581,7 @@ function JobSearch() {
                   {jobMainCats.map(main => (
                     <button
                       key={main.cd}
-                      onClick={() => { setSelectedJobMainCd(main.cd); ensureLoadSubCats(main.cd) }}
+                      onClick={() => { setSelectedJobMainCd(main.cd); setSelectAllSubcats(false); setSelectedJobSubcats([]); ensureLoadSubCats(main.cd) }}
                       style={{
                         width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
                         background: selectedJobMainCd === main.cd ? '#e3f2fd' : 'transparent',
@@ -550,7 +606,8 @@ function JobSearch() {
                   </div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(140px, 1fr))', gap: 6 }}>
                     {(jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm) || []).map(sub => {
-                      const selected = selectedJobSubcats.includes(sub)
+                      const isAll = sub === '전체'
+                      const selected = isAll ? selectAllSubcats : selectedJobSubcats.includes(sub)
                       return (
                         <label key={`${selectedJobMainCd}-${sub}`} style={{
                           display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
@@ -561,10 +618,20 @@ function JobSearch() {
                             type="checkbox"
                             checked={selected}
                             onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedJobSubcats(prev => prev.length >= 5 ? prev : [...prev, sub])
+                              if (isAll) {
+                                // '전체' 토글
+                                const next = e.target.checked
+                                setSelectAllSubcats(next)
+                                if (next && selectedJobMainCd) ensureLoadSubCats(selectedJobMainCd)
+                                if (next) setSelectedJobSubcats([])
                               } else {
-                                setSelectedJobSubcats(prev => prev.filter(s => s !== sub))
+                                if (e.target.checked) {
+                                  // 개별 선택 시 '전체' 해제
+                                  if (selectAllSubcats) setSelectAllSubcats(false)
+                                  setSelectedJobSubcats(prev => prev.length >= 5 ? prev : [...prev, sub])
+                                } else {
+                                  setSelectedJobSubcats(prev => prev.filter(s => s !== sub))
+                                }
                               }
                             }}
                           />
@@ -593,7 +660,7 @@ function JobSearch() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="구직 제목, 기술 또는 회사 입력"
+            placeholder="구직 제목, 지역, 업직종 검색"
             style={{
               width: '100%',
               padding: '10px 12px 10px 36px',

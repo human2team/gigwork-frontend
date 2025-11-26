@@ -19,6 +19,16 @@ type RecommendedJob = {
 
 function Recommendations() {
   const navigate = useNavigate()
+  // 화면 비표시(임시 비활성화): 라우팅되면 즉시 홈으로 이동하고 아무 것도 렌더링하지 않음
+  const HIDE_PAGE = true
+  useEffect(() => {
+    if (HIDE_PAGE) {
+      navigate('/')
+    }
+  }, [navigate])
+  if (HIDE_PAGE) {
+    return null
+  }
   const [minSuitability, setMinSuitability] = useState(50)
   const [showFilters, setShowFilters] = useState(false)
   const [selectedJobTypes, setSelectedJobTypes] = useState<string[]>([])
@@ -27,7 +37,7 @@ function Recommendations() {
   const [loading, setLoading] = useState(true)
   const [sortBy, setSortBy] = useState<'suitability' | 'salary' | 'recent'>('suitability')
   const [currentPage, setCurrentPage] = useState(1)
-  const PER_PAGE = 9
+  const PER_PAGE = 10
   
   // 백엔드에 등록된 직업 카테고리 (JobPosting.tsx와 동일)
   const jobCategories = [
