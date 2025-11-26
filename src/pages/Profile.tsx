@@ -17,6 +17,8 @@ type SavedJob = {
   description: string
   type: string
   posted: string
+  postingStatus?: string
+  deadline?: string
 }
 
 type AppliedJob = {
@@ -30,6 +32,8 @@ type AppliedJob = {
   type: string
   posted: string
   status: string
+  postingStatus?: string
+  deadline?: string
 }
 
 type License = {
@@ -159,6 +163,37 @@ function Profile() {
   
   // 프로필 로딩 상태
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
+  // 급여 표시 보조 함수: 시급/일급/월급 접두 + $공백 제거
+  const formatSalaryLabel = (salary: any, salaryType?: any): string => {
+    const raw = String(salary ?? '').replace(/\$\s+/g, '$').trim()
+    const t = String(salaryType ?? '').toUpperCase()
+    const hasKoreanLabel = /시급|일급|월급|연봉/.test(raw)
+
+    const detectByType = (): string | '' => {
+      if (!t) return ''
+      if (t.includes('HOURLY') || t.includes('HOUR') || t.includes('시급')) return '시급'
+      if (t.includes('DAILY') || t.includes('DAY') || t.includes('일급')) return '일급'
+      if (t.includes('MONTH') || t.includes('MONTHLY') || t.includes('월급')) return '월급'
+      if (t.includes('YEAR') || t.includes('ANNUAL') || t.includes('연봉')) return '연봉'
+      return ''
+    }
+
+    const detectHeuristic = (): string | '' => {
+      // 급여 문자열에 한글 라벨이 없고 타입도 없을 때 숫자 범위로 추정
+      const num = parseInt(String(raw).replace(/[^0-9]/g, '') || '0', 10)
+      if (!Number.isFinite(num) || num <= 0) return ''
+      // 대략적 기준: < 100,000 시급, 100,000~999,999 일급, ≥ 1,000,000 월급
+      if (num >= 1_000_000) return '월급'
+      if (num >= 100_000) return '일급'
+      return '시급'
+    }
+
+    const label =
+      detectByType() ||
+      (hasKoreanLabel ? '' : detectHeuristic())
+
+    return label ? `${label} ${raw || '협의'}` : (raw || '협의')
+  }
   
   // 프로필 불러오기
   useEffect(() => {
@@ -244,6 +279,7 @@ function Profile() {
   const [isLoadingLicenses, setIsLoadingLicenses] = useState(false)
   const [experience, setExperience] = useState<Experience[]>([])
   const [isLoadingExperiences, setIsLoadingExperiences] = useState(false)
+  const [activeJobIds, setActiveJobIds] = useState<number[]>([])
   
   // 지역 API: 시/도 목록 로드
   useEffect(() => {
@@ -848,6 +884,19 @@ function Profile() {
     if (diffDays < 30) return `${Math.floor(diffDays / 7)}주전`
     return `${Math.floor(diffDays / 30)}개월전`
   }
+  
+  // 공고 마감 여부
+  const isJobClosed = (status?: string, deadline?: string): boolean => {
+    const s = String(status || '').trim().toLowerCase()
+    if (s && (s === 'closed' || s.includes('마감') || s.includes('종료') || s.includes('마감됨'))) return true
+    if (!deadline) return false
+    const d = new Date(deadline)
+    if (isNaN(d.getTime())) return false
+    const today = new Date()
+    d.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+    return d < today
+  }
 
   // 저장된 일자리 불러오기 (API 연동)
   useEffect(() => {
@@ -871,9 +920,13 @@ function Profile() {
               company: job.company || '',
               location: job.location || '',
               salary: job.salary || '협의',
+              salaryType: job.salaryType || job.salary_type || null,
               description: job.description || '',
               type: job.jobType || '파트타임',
-              posted: job.postedDate ? getDaysAgo(job.postedDate) : '최근'
+              posted: job.postedDate ? getDaysAgo(job.postedDate) : '최근',
+              // 가능한 키를 폭넓게 수용
+              postingStatus: job.status || job.jobStatus || job.postingStatus || job.job_post_status || job.post_status || null,
+              deadline: job.deadline || job.jobDeadline || job.job_deadline || job.deadlineDate || job.job_deadline_date || null
             }))
             console.log('✅ 저장된 일자리 개수:', formattedJobs.length, formattedJobs)
             setSavedJobs(formattedJobs)
@@ -914,20 +967,63 @@ function Profile() {
     const fetchApplications = async () => {
       try {
         const response = await apiCall(`/api/jobseeker/applications/${userId}`, { method: 'GET' })
-        if (Array.isArray(response)) {
-          const formattedJobs = response.map((app: any) => ({
+          if (Array.isArray(response)) {
+            const formattedJobs = response.map((app: any) => ({
             id: app.jobId,
             applicationId: app.id, // 지원서 ID (삭제용)
             title: app.jobTitle,
             company: app.company || '',
             location: app.location || '',
             salary: app.salary || '협의',
+            salaryType: app.salaryType || app.salary_type || null,
             description: app.description || '',
             type: app.jobType || '파트타임',
             posted: app.posted || '최근',
-            status: app.status || 'PENDING'
+            status: app.status || 'PENDING',
+            // 공고 상태 키 확장 + 앱 상태가 '마감/종료' 의미일 경우도 수용
+            postingStatus: app.jobStatus || app.postingStatus || app.job_status || app.job_post_status || app.post_status
+              || (app.job ? (app.job.status || app.job.jobStatus || app.job.postingStatus || app.job.job_status || app.job.post_status) : null)
+              || (typeof app.status === 'string' ? app.status : null),
+            deadline: app.deadline || app.jobDeadline || app.job_deadline || app.deadlineDate || app.job_deadline_date
+              || (app.job ? (app.job.deadline || app.job.jobDeadline || app.job.job_deadline || app.job.deadlineDate || app.job.job_deadline_date) : null)
+              || null
           }))
-          setAppliedJobs(formattedJobs)
+          // 상세 정보로 마감 보강 (필드가 비어있는 항목만)
+          const enrichWithDetails = async (jobsArr: AppliedJob[]) => {
+            return await Promise.all(jobsArr.map(async (j) => {
+              if (j.postingStatus || j.deadline) return j
+              try {
+                // 구직자 상세 API 우선 시도
+                let res = await fetch(`/api/jobs/detail/${j.id}`)
+                if (!res.ok) {
+                  // 실패 시 고용주 상세 API로 폴백
+                  res = await fetch(`/api/employer/jobs/detail/${j.id}`)
+                }
+                if (res.ok) {
+                  const data = await res.json()
+                  const postingStatus = data.status || data.jobStatus || data.postingStatus || null
+                  const deadline = data.deadline || data.jobDeadline || data.job_deadline || null
+                  return { ...j, postingStatus, deadline }
+                }
+              } catch {
+                // ignore
+              }
+              return j
+            }))
+          }
+          const enriched = await enrichWithDetails(formattedJobs as AppliedJob[])
+          setAppliedJobs(enriched)
+          // 활성 공고 ID 목록 로드(없으면 마감으로 간주하는 보강 로직)
+          try {
+            const actRes = await fetch('/api/jobs/active')
+            if (actRes.ok) {
+              const act = await actRes.json()
+              if (Array.isArray(act)) {
+                const ids = act.map((j: any) => Number(j.id)).filter((v: any) => Number.isFinite(v))
+                setActiveJobIds(ids)
+              }
+            }
+          } catch {}
         }
       } catch (error) {
         console.error('지원 내역을 불러오는데 실패했습니다:', error)
@@ -2701,6 +2797,16 @@ function Profile() {
                       <div style={{ flex: 1 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                           <h3 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>{job.title}</h3>
+                          {isJobClosed((job as any).postingStatus, (job as any).deadline) && (
+                            <span style={{
+                              padding: '4px 12px',
+                              backgroundColor: '#ffebee',
+                              color: '#d32f2f',
+                              borderRadius: '4px',
+                              fontSize: '12px',
+                              fontWeight: 'bold'
+                            }}>마감</span>
+                          )}
                           {(applicationStatus === '합격' || applicationStatus === 'ACCEPTED') && (
                             <span style={{
                               padding: '4px 12px',
@@ -2740,7 +2846,7 @@ function Profile() {
                           </span>
                           <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <DollarSign size={16} />
-                            {job.salary}
+                            {formatSalaryLabel((job as any).salary, (job as any).salaryType || (job as any).salary_type)}
                           </span>
                         </div>
                         <p style={{ color: '#666', fontSize: '14px', marginBottom: '12px' }}>{job.description}</p>
@@ -2851,6 +2957,19 @@ function Profile() {
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                         <h3 style={{ fontSize: '20px', fontWeight: 'bold', margin: 0 }}>{job.title}</h3>
+                        {(
+                          isJobClosed((job as any).postingStatus, (job as any).deadline) ||
+                          (activeJobIds.length > 0 && !activeJobIds.includes((job as any).id))
+                        ) && (
+                          <span style={{
+                            padding: '4px 12px',
+                            backgroundColor: '#ffebee',
+                            color: '#d32f2f',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            fontWeight: 'bold'
+                          }}>마감</span>
+                        )}
                         {(job.status === '합격' || job.status === 'ACCEPTED') && (
                           <span style={{
                             padding: '4px 12px',
@@ -2888,9 +3007,9 @@ function Profile() {
                           <MapPin size={16} />
                           {job.location}
                         </span>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <DollarSign size={16} />
-                          {job.salary}
+                           {formatSalaryLabel((job as any).salary, (job as any).salaryType || (job as any).salary_type)}
                         </span>
                       </div>
                       <p style={{ color: '#666', fontSize: '14px', marginBottom: '12px' }}>{job.description}</p>

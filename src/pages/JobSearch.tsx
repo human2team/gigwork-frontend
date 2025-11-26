@@ -8,10 +8,22 @@ const getDaysAgo = (dateString: string): string => {
   if (!dateString) return '최근'
   const now = new Date()
   const d = new Date(dateString)
+  if (isNaN(d.getTime())) return '최근'
   const ms = now.getTime() - d.getTime()
   const minutes = Math.floor(ms / (1000 * 60))
   const hours = Math.floor(ms / (1000 * 60 * 60))
   const days = Math.floor(ms / (1000 * 60 * 60 * 24))
+
+  // 같은 날짜에 등록된 항목은 시간대 차이로 인한 혼동을 줄이기 위해 '최근'으로 처리
+  const sameDay = (() => {
+    const dn = new Date(d)
+    const nn = new Date(now)
+    dn.setHours(0, 0, 0, 0)
+    nn.setHours(0, 0, 0, 0)
+    return dn.getTime() === nn.getTime()
+  })()
+  if (sameDay && hours < 6) return minutes < 1 ? '방금 전' : '최근'
+
   if (minutes < 1) return '방금 전'
   if (minutes < 60) return `${minutes}분 전`
   if (hours < 24) return `${hours}시간 전`
@@ -150,7 +162,7 @@ function JobSearch() {
   const [excludeBar, setExcludeBar] = useState(false)
   const [locationSearchQuery, setLocationSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const PER_PAGE = 9
+  const PER_PAGE = 10
   // 서버 카테고리 상태
   const [jobMainCats, setJobMainCats] = useState<CategoryItem[]>([])
   const [jobSubCatsByMain, setJobSubCatsByMain] = useState<Record<string, CategoryItem[]>>({})
@@ -297,10 +309,17 @@ function JobSearch() {
 
   // 필터링된 일자리
   const filteredJobs = jobs.filter(job => {
-    const matchesSearch = searchQuery === '' || 
-      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.description.toLowerCase().includes(searchQuery.toLowerCase());
+    // 검색: 구직제목, 지역(근무지), 업직종 카테고리
+    const q = searchQuery.trim().toLowerCase()
+    const qDot = q.replace(/·/g, '.')
+    const titleNorm = (job.title || '').toLowerCase()
+    const locationNorm = (job.location || '').toLowerCase()
+    const categoryNorm = (job.category || '').toLowerCase().replace(/·/g, '.')
+    const matchesSearch =
+      q === '' ||
+      titleNorm.includes(q) ||
+      locationNorm.includes(q) ||
+      categoryNorm.includes(qDot);
 
     // 지역명 기반 필터링
     let matchesLocation = true;
@@ -641,7 +660,7 @@ function JobSearch() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="구직 제목, 기술 또는 회사 입력"
+            placeholder="구직 제목, 지역, 업직종 검색"
             style={{
               width: '100%',
               padding: '10px 12px 10px 36px',

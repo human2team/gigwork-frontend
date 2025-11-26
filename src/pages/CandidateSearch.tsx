@@ -15,11 +15,37 @@ function CandidateSearch() {
   const [selectedJobId, setSelectedJobId] = useState<string>('')
   const [busyIds, setBusyIds] = useState<number[]>([])
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [proposedIds, setProposedIds] = useState<number[]>(() => {
-    const key = employerUserId ? `proposedIds:${employerUserId}` : 'proposedIds:guest'
-    const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : [];
-  });
+  // 공고별 제안 상태를 (jobId:jobseekerId) 문자열로 관리
+  const PAIRS_KEY = employerUserId ? `proposedPairs:${employerUserId}` : 'proposedPairs:guest'
+  const [proposedPairs, setProposedPairs] = useState<string[]>(() => {
+    const stored = localStorage.getItem(PAIRS_KEY)
+    return stored ? JSON.parse(stored) : []
+  })
+  // 거절된 제안(공고-구직자 쌍)
+  const [declinedPairs, setDeclinedPairs] = useState<string[]>([])
+  // 로컬 캐시: 제안 목록에서 사라진 쌍을 일시적으로 '거절됨'으로 간주(서버가 기록을 안 줄 때 대비)
+  const DECLINED_CACHE_KEY = employerUserId ? `declinedPairsCache:${employerUserId}` : 'declinedPairsCache:guest'
+  const DECLINED_TTL_MS = 7 * 24 * 60 * 60 * 1000 // 7일
+  const loadDeclinedCache = (): Record<string, number> => {
+    try {
+      const raw = localStorage.getItem(DECLINED_CACHE_KEY)
+      const obj = raw ? JSON.parse(raw) : {}
+      const now = Date.now()
+      const cleaned: Record<string, number> = {}
+      Object.keys(obj || {}).forEach((k) => {
+        if (typeof obj[k] === 'number' && now - obj[k] <= DECLINED_TTL_MS) cleaned[k] = obj[k]
+      })
+      if (raw) localStorage.setItem(DECLINED_CACHE_KEY, JSON.stringify(cleaned))
+      return cleaned
+    } catch {
+      return {}
+    }
+  }
+  const saveDeclinedCache = (cache: Record<string, number>) => {
+    try {
+      localStorage.setItem(DECLINED_CACHE_KEY, JSON.stringify(cache))
+    } catch {}
+  }
   // JobSearch 스타일 컨트롤 바용
   const [showRegionPopup, setShowRegionPopup] = useState(false)
   const [showJobPopup, setShowJobPopup] = useState(false)
@@ -98,15 +124,87 @@ function CandidateSearch() {
     }
   }
 
-  const setProposedIdsWithStorage = (updater: number[] | ((prev: number[]) => number[])) => {
-    setProposedIds(prev => {
-      const next = typeof updater === 'function' ? (updater as (p: number[]) => number[])(prev) : updater
-      const key = employerUserId ? `proposedIds:${employerUserId}` : 'proposedIds:guest'
-      localStorage.setItem(key, JSON.stringify(next))
+  const makePair = (jobId: string | number, jobseekerId: string | number) => `${jobId}:${jobseekerId}`
+  const setProposedPairsWithStorage = (updater: string[] | ((prev: string[]) => string[])) => {
+    setProposedPairs(prev => {
+      const next = typeof updater === 'function' ? (updater as (p: string[]) => string[])(prev) : updater
+      localStorage.setItem(PAIRS_KEY, JSON.stringify(next))
       return next
     })
   }
 
+  // 거절된 제안 목록 동기화 (서버가 제공하는 엔드포인트 중 사용 가능 한 것을 시도)
+  useEffect(() => {
+    const fetchDeclined = async () => {
+      const currentEmployerId = employerProfileId || ''
+      if (!currentEmployerId) {
+        const cache = loadDeclinedCache()
+        setDeclinedPairs(Object.keys(cache))
+        return
+      }
+      try {
+        const tryUrls = [
+          `/api/proposals/declined?employerId=${currentEmployerId}`,
+          `/api/proposals/events?employerId=${currentEmployerId}`,
+          `/api/proposals/employer/${currentEmployerId}?status=DECLINED`,
+          `/api/proposals?employerId=${currentEmployerId}&status=DECLINED`
+        ]
+        let pairs: string[] | null = null
+        for (const url of tryUrls) {
+          try {
+            const res = await fetch(url)
+            if (!res.ok) continue
+            const data = await res.json().catch(() => [])
+            const list = Array.isArray(data) ? data : (Array.isArray((data as any).content) ? (data as any).content : [])
+            if (Array.isArray(list)) {
+              pairs = list.map((p: any) => {
+                const jsRaw = p.jobseekerId ?? p.jobSeekerId ?? p.jobseeker?.id ?? p.jobSeeker?.id
+                const jobRaw = p.jobId ?? p.job?.id ?? p.postingId ?? p.posting_id
+                const jobId = typeof jobRaw === 'string' ? parseInt(jobRaw, 10) : jobRaw
+                const jsId = typeof jsRaw === 'string' ? parseInt(jsRaw, 10) : jsRaw
+                if (Number.isFinite(jobId) && Number.isFinite(jsId)) return makePair(jobId, jsId)
+                return null
+              }).filter(Boolean) as string[]
+              break
+            }
+          } catch {}
+        }
+        const cache = loadDeclinedCache()
+        const union = new Set<string>([...(pairs || []), ...Object.keys(cache)])
+        setDeclinedPairs(Array.from(union))
+      } catch {
+        const cache = loadDeclinedCache()
+        setDeclinedPairs(Object.keys(cache))
+      }
+    }
+    fetchDeclined()
+  }, [employerProfileId])
+        {/* 검색어: 이름, 경력, 강점 */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
+          <Search size={18} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#999' }} />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="이름, 경력, 강점 검색"
+            style={{
+              width: '100%',
+              padding: '10px 12px 10px 36px',
+              border: '1px solid #e0e0e0',
+              borderRadius: 6,
+              fontSize: 14
+            }}
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              title="지우기"
+              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', border: 'none', background: 'transparent', cursor: 'pointer' }}
+            >
+              <X size={16} color="#999" />
+            </button>
+          )}
+        </div>
   useEffect(() => {
     // 사업자 프로필 ID 동기화 (proposals API는 EmployerProfile ID 요구)
     const fetchEmployerProfileId = async () => {
@@ -140,7 +238,8 @@ function CandidateSearch() {
     const fetchCandidates = async () => {
       try {
         const params = new URLSearchParams()
-        if (searchQuery) params.append('search', searchQuery)
+        // 검색은 클라이언트에서 지역/업직종 기준으로 수행하므로
+        // 서버 요청에는 search 파라미터를 포함하지 않습니다.
         if (locationFilter !== '전체') params.append('location', locationFilter)
         if (licenseFilter !== '전체') params.append('license', licenseFilter)
         if (minSuitability > 0) params.append('minSuitability', String(minSuitability))
@@ -189,7 +288,7 @@ function CandidateSearch() {
     const fetchProposed = async () => {
       const currentEmployerId = employerProfileId || ''
       if (!currentEmployerId) {
-        setProposedIdsWithStorage([])
+        setProposedPairsWithStorage([])
         return;
       }
       try {
@@ -216,18 +315,31 @@ function CandidateSearch() {
           }
         }
         if (fetched) {
-          const ids = fetched.map((p: any) => {
-            const raw =
-              p.jobseekerId ??
-              p.jobSeekerId ??
-              p.jobseekerID ??
-              p.jobSeekerID ??
-              p.jobseeker?.id ??
-              p.jobSeeker?.id;
-            const num = typeof raw === 'string' ? parseInt(raw, 10) : raw;
-            return Number.isFinite(num) ? num : null;
-          }).filter((id: any) => id !== null) as number[];
-          setProposedIdsWithStorage(ids);
+          const pairs = fetched.map((p: any) => {
+            const jsRaw =
+              p.jobseekerId ?? p.jobSeekerId ?? p.jobseekerID ?? p.jobSeekerID ??
+              p.jobseeker?.id ?? p.jobSeeker?.id
+            const jobRaw =
+              p.jobId ?? p.job_id ?? p.job?.id ?? p.postingId ?? p.posting_id
+            const jobId = typeof jobRaw === 'string' ? parseInt(jobRaw, 10) : jobRaw
+            const jsId = typeof jsRaw === 'string' ? parseInt(jsRaw, 10) : jsRaw
+            if (Number.isFinite(jobId) && Number.isFinite(jsId)) return makePair(jobId, jsId)
+            return null
+          }).filter(Boolean) as string[]
+          // 이전 제안 쌍 대비 사라진 쌍을 로컬 캐시에 '거절됨'으로 기록
+          setProposedPairs(prev => {
+            const next = pairs
+            const removed = prev.filter(p => !next.includes(p))
+            if (removed.length > 0) {
+              const cache = loadDeclinedCache()
+              const now = Date.now()
+              removed.forEach(r => { cache[r] = now })
+              saveDeclinedCache(cache)
+              setDeclinedPairs(Array.from(new Set<string>([...declinedPairs, ...removed])))
+            }
+            localStorage.setItem(PAIRS_KEY, JSON.stringify(next))
+            return next
+          })
         } else {
           console.warn('proposals fetch failed; last status:', lastStatus);
           // 서버에서 제공하지 않으면 DB 기준 동기화가 불가 → 로컬 상태를 유지
@@ -295,50 +407,52 @@ function CandidateSearch() {
   }
 
   const filteredCandidates = candidates.filter(candidate => {
-    const matchesSearch = candidate.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         candidate.experience?.some((exp: string) => exp.toLowerCase().includes(searchQuery.toLowerCase()))
-    const preferredText = getPreferredLocationText(candidate)
+    const searchRaw = searchQuery.trim();
+    const searchLower = searchRaw.toLowerCase();
+    const searchKo = normalizeKo(searchRaw);
+
+    // 후보자의 희망 지역 텍스트 (시/도 구/군 동)
+    const preferredText = getPreferredLocationText(candidate);
+
+    // 지역 매칭: 한글 행정구역 정규화 후 부분 매칭 (양방향 포함)
+    const locationNorm = normalizeKo(preferredText);
+    const locationMatchBySearch =
+      searchRaw !== '' && (locationNorm.includes(searchKo) || searchKo.includes(locationNorm));
+
+    // 업직종 카테고리 매칭: desiredCategories 혹은 desiredCategory 기준 부분 매칭
+    const desiredRaw = Array.isArray(candidate.desiredCategories)
+      ? candidate.desiredCategories
+      : (candidate.desiredCategory ? [candidate.desiredCategory] : []);
+    const desiredNames = desiredRaw
+      .map((v: any) => String(v).trim())
+      .filter((v: string) => v.length > 0);
+    const desiredJoinedLower = desiredNames.join(' ').toLowerCase();
+    const desiredJoinedLowerNorm = desiredJoinedLower.replace(/·/g, '.');
+    const queryLowerNorm = searchLower.replace(/·/g, '.');
+    const categoryMatchBySearch =
+      searchRaw !== '' && (
+        desiredJoinedLower.includes(searchLower) ||
+        desiredJoinedLowerNorm.includes(queryLowerNorm)
+      );
+
+    // 검색어가 비어있으면 전체 허용, 아니면 지역 또는 카테고리 중 하나라도 매칭되어야 함
+    const matchesSearch = searchRaw === '' || locationMatchBySearch || categoryMatchBySearch;
+
+    // 기존 필터 유지 (별도 위치 필터 UI와의 결합)
+    // locationFilter가 '전체'가 아니면 preferredText와 normalizeKo 기반으로 필터
+    // licenseFilter, minSuitability도 유지
+
+    // 위치 필터
     const matchesLocation = (() => {
-      if (locationFilter === '전체') return true
-      const nf = normalizeKo(locationFilter)
-      const np = normalizeKo(preferredText)
-      if (!nf) return true
-      return np.includes(nf) || nf.includes(np)
-    })()
+      if (locationFilter === '전체') return true;
+      const nf = normalizeKo(locationFilter);
+      const np = normalizeKo(preferredText);
+      if (!nf) return true;
+      return np.includes(nf) || nf.includes(np);
+    })();
     const matchesLicense = licenseFilter === '전체' || candidate.licenses?.some((license: string) => license.includes(licenseFilter))
     const matchesSuitability = candidate.suitability >= minSuitability
-    // 업직종 카테고리 매칭(유연한 필드 대응)
-    const rawCats: any[] = []
-    if ((candidate as any).category) rawCats.push((candidate as any).category)
-    if ((candidate as any).categories) rawCats.push(...(candidate as any).categories)
-    if ((candidate as any).desiredCategory) rawCats.push((candidate as any).desiredCategory)
-    if ((candidate as any).desiredCategories) rawCats.push(...(candidate as any).desiredCategories)
-    if ((candidate as any).targetCategories) rawCats.push(...(candidate as any).targetCategories)
-    const catTexts = rawCats
-      .flat()
-      .filter((v) => v != null)
-      .map((v) => String(v).toLowerCase())
-    const subcatMatch = (() => {
-      // 개별 소분류 선택 시: 그 중 하나라도 포함되면 통과
-      if (selectedJobSubcats.length > 0) {
-        return selectedJobSubcats.some(sub => catTexts.some(ct => ct.includes(sub.toLowerCase())))
-      }
-      // '전체' 선택 또는 대분류만 선택 시: 해당 대분류의 모든 소분류 중 하나라도 포함되면 통과
-      if ((selectAllSubcats || selectedJobSubcats.length === 0) && selectedJobMainCd) {
-        const subs = (jobSubCatsByMain[selectedJobMainCd]?.map(s => s.nm.toLowerCase())) || []
-        if (subs.length > 0) {
-          return subs.some(s => catTexts.some(ct => ct.includes(s)))
-        }
-        // 소분류 목록을 아직 못 불러왔으면 대분류 이름으로 우선 매칭 시도
-        const main = jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm?.toLowerCase() || ''
-        return main ? catTexts.some(ct => ct.includes(main)) : true
-      }
-      // 카테고리 필터 미적용
-      return true
-    })()
-    const barExcludedOk = excludeBar ? catTexts.every(ct => !ct.includes('bar')) : true
-    const matchesCategory = subcatMatch && barExcludedOk
-    return matchesSearch && matchesLocation && matchesLicense && matchesSuitability && matchesCategory
+    return matchesSearch && matchesLocation && matchesLicense && matchesSuitability;
   })
 
   return (
@@ -626,7 +740,7 @@ function CandidateSearch() {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="이름, 경력, 기술 검색"
+            placeholder="지역, 업직종 카테고리 검색"
             style={{
               width: '100%',
               padding: '10px 12px 10px 36px',
@@ -658,9 +772,38 @@ function CandidateSearch() {
           }}
         >
           <option>전체</option>
+          {/* 운전/물류 */}
           <option>운전면허증</option>
+          <option>1종 보통</option>
+          <option>2종 보통</option>
+          <option>화물운전면허</option>
+          <option>지게차 운전기능사</option>
+          <option>지게차 면허</option>
+          {/* 건설/기계 */}
+          <option>굴삭기 운전기능사</option>
           <option>포크레인 면허</option>
+          <option>건설기계 조종사</option>
+          <option>용접기능사</option>
+          <option>전기기능사</option>
+          <option>전기기사</option>
+          <option>산업안전기사</option>
+          {/* 외식/음료 */}
           <option>바리스타 자격증</option>
+          <option>조리기능사(한식)</option>
+          <option>조리기능사(양식)</option>
+          <option>조리기능사(일식)</option>
+          {/* IT/사무 */}
+          <option>정보처리기사</option>
+          <option>네트워크관리사</option>
+          <option>리눅스마스터</option>
+          <option>컴퓨터활용능력 1급</option>
+          {/* 의료/요양 */}
+          <option>간호조무사</option>
+          <option>요양보호사</option>
+          {/* 교육/미용/서비스 */}
+          <option>보육교사</option>
+          <option>미용사</option>
+          <option>네일아트 자격증</option>
         </select>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 12, color: '#666' }}>최소 적합도</span>
@@ -769,7 +912,13 @@ function CandidateSearch() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <strong style={{ fontSize: 15, color: '#222' }}>{candidate.name}</strong>
                       <span style={{ fontSize: 13, color: '#666' }}>({candidate.age}세)</span>
-                      {proposedIds.includes(candidate.id) && (
+                      {(() => {
+                        if (!selectedJobId) return null
+                        const pair = makePair(selectedJobId, candidate.id)
+                        // 거절된 경우에는 '이미 제안함' 뱃지를 숨김
+                        if (declinedPairs.includes(pair)) return null
+                        if (!proposedPairs.includes(pair)) return null
+                        return (
                         <span style={{
                           padding: '2px 8px',
                           backgroundColor: '#e8f5e9',
@@ -778,6 +927,17 @@ function CandidateSearch() {
                           fontSize: 12,
                           fontWeight: 600
                         }}>이미 제안함</span>
+                        )
+                      })()}
+                      {selectedJobId && declinedPairs.includes(makePair(selectedJobId, candidate.id)) && (
+                        <span style={{
+                          padding: '2px 8px',
+                          backgroundColor: '#fff3e0',
+                          color: '#ef6c00',
+                          borderRadius: 12,
+                          fontSize: 12,
+                          fontWeight: 600
+                        }}>거절됨</span>
                       )}
                     </div>
                     <div style={{ fontSize: 12, color: '#999' }}>
@@ -824,7 +984,13 @@ function CandidateSearch() {
                 <div style={{ fontSize: 13, color: '#999' }}>{updatedAgo}</div>
                 {/* 액션 */}
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
-                  {proposedIds.includes(candidate.id) ? (
+                  {(() => {
+                    if (!selectedJobId) return null
+                    const pair = makePair(selectedJobId, candidate.id)
+                    const isDeclined = declinedPairs.includes(pair)
+                    const isProposed = proposedPairs.includes(pair) && !isDeclined
+                    if (isProposed) {
+                      return (
                     <button
                       onClick={async () => {
                     if (!window.confirm(`${candidate.name}님에게 보낸 제안을 취소하시겠습니까?`)) return;
@@ -842,19 +1008,24 @@ function CandidateSearch() {
                       });
                       setBusyIds(prev => prev.filter(id => id !== candidate.id))
                       if (res.ok) {
-                        setProposedIdsWithStorage(prev => prev.filter(id => id !== candidate.id));
+                        const p = makePair(jobId, jobseekerId)
+                        setProposedPairsWithStorage(prev => prev.filter(x => x !== p));
                         setToast({ message: '채용 제안이 취소되었습니다.', type: 'success' })
                         setTimeout(() => setToast(null), 2000)
                       } else {
                         // 실패해도 proposedIds에서 제거하여 버튼이 제안하기로 변경되게 함
-                        setProposedIdsWithStorage(prev => prev.filter(id => id !== candidate.id));
+                        const p = makePair(jobId, jobseekerId)
+                        setProposedPairsWithStorage(prev => prev.filter(x => x !== p));
                         const data = await res.json().catch(() => ({}));
                         setToast({ message: data.error || '채용 제안 취소에 실패했습니다.', type: 'error' })
                         setTimeout(() => setToast(null), 2500)
                       }
                     } catch (e) {
                       // 네트워크 등 예외 발생 시에도 proposedIds에서 제거
-                      setProposedIdsWithStorage(prev => prev.filter(id => id !== candidate.id));
+                      if (selectedJobId) {
+                        const p = makePair(selectedJobId, candidate.id)
+                        setProposedPairsWithStorage(prev => prev.filter(x => x !== p));
+                      }
                       setToast({ message: '채용 제안 취소에 실패했습니다.', type: 'error' })
                       setTimeout(() => setToast(null), 2500)
                     }
@@ -877,7 +1048,10 @@ function CandidateSearch() {
                       <MessageSquare size={16} />
                       제안 취소
                     </button>
-                  ) : (
+                      )
+                    }
+                    // 제안하지 않았거나 거절된 경우 → 제안하기
+                    return (
                     <button
                       onClick={async () => {
                     if (!window.confirm(`${candidate.name}님에게 채용 제안을 보내시겠습니까?`)) return;
@@ -891,7 +1065,7 @@ function CandidateSearch() {
                         alert('먼저 상단에서 제안 보낼 공고를 선택하세요.');
                         return;
                       }
-                      if (proposedIds.includes(candidate.id)) {
+                      if (selectedJobId && proposedPairs.includes(makePair(selectedJobId, candidate.id)) && !declinedPairs.includes(makePair(selectedJobId, candidate.id))) {
                         setToast({ message: '이미 제안한 지원자입니다.', type: 'error' })
                         setTimeout(() => setToast(null), 2000)
                         return;
@@ -916,7 +1090,10 @@ function CandidateSearch() {
                       });
                       setBusyIds(prev => prev.filter(id => id !== candidate.id))
                       if (res.ok) {
-                        setProposedIdsWithStorage(prev => [...prev, candidate.id]);
+                        const p = makePair(jobId, jobseekerId)
+                        setProposedPairsWithStorage(prev => [...prev, p]);
+                        // 거절 목록에서 제거(재제안 성공)
+                        setDeclinedPairs(prev => prev.filter(x => x !== p))
                         setToast({ message: '채용 제안이 성공적으로 전송되었습니다.', type: 'success' })
                         setTimeout(() => setToast(null), 2000)
                       } else {
@@ -934,21 +1111,22 @@ function CandidateSearch() {
                         padding: '8px 12px',
                         border: 'none',
                         borderRadius: 6,
-                        backgroundColor: proposedIds.includes(candidate.id) ? '#bdbdbd' : '#2196f3',
+                        backgroundColor: '#2196f3',
                         color: '#ffffff',
-                        cursor: proposedIds.includes(candidate.id) || busyIds.includes(candidate.id) ? 'not-allowed' : 'pointer',
+                        cursor: (selectedJobId && proposedPairs.includes(makePair(selectedJobId, candidate.id)) && !declinedPairs.includes(makePair(selectedJobId, candidate.id))) || busyIds.includes(candidate.id) ? 'not-allowed' : 'pointer',
                         fontSize: 13,
                         display: 'flex',
                         alignItems: 'center',
                         gap: 4,
-                        opacity: proposedIds.includes(candidate.id) || busyIds.includes(candidate.id) ? 0.7 : 1
+                        opacity: ((selectedJobId && proposedPairs.includes(makePair(selectedJobId, candidate.id)) && !declinedPairs.includes(makePair(selectedJobId, candidate.id))) || busyIds.includes(candidate.id)) ? 0.7 : 1
                       }}
-                      disabled={proposedIds.includes(candidate.id) || busyIds.includes(candidate.id)}
+                      disabled={(selectedJobId && proposedPairs.includes(makePair(selectedJobId, candidate.id)) && !declinedPairs.includes(makePair(selectedJobId, candidate.id))) || busyIds.includes(candidate.id)}
                     >
                       <MessageSquare size={16} />
                       제안하기
                     </button>
-                  )}
+                    )
+                  })()}
                 </div>
               </div>
             )
