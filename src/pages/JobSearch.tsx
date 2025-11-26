@@ -709,9 +709,9 @@ function JobSearch() {
                   </button>
                 </div>
                 {/* 근무지 */}
-                <div style={{ fontSize: '14px', color: '#555' }}>{job.location}</div>
+                <div style={{ fontSize: '14px', color: '#555', marginLeft: -50 }}>{job.location}</div>
                 {/* 근무시간 */}
-                <div style={{ fontSize: '14px', color: '#555' }}>{workTime}</div>
+                <div style={{ fontSize: '14px', color: '#555', marginLeft: -10 }}>{workTime}</div>
                 {/* 급여 */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{

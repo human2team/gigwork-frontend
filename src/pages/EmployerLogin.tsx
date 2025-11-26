@@ -13,7 +13,6 @@ function EmployerLogin() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    
     setIsSubmitting(true)
     try {
       const response = await apiCall<{
@@ -21,6 +20,8 @@ function EmployerLogin() {
         email: string
         userType: string
         message: string
+        accessToken: string
+        refreshToken: string
       }>('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -31,37 +32,38 @@ function EmployerLogin() {
           password: password
         })
       })
-      
-      // 로그인 성공 처리
-      
+
       // userType 확인
       if (response.userType !== 'EMPLOYER') {
         alert('사업자 계정이 아닙니다.')
         return
       }
-      
-      // userId를 localStorage에 저장
+
+      // JWT 토큰과 사용자 정보를 localStorage에 저장
+      localStorage.setItem('accessToken', response.accessToken)
+      localStorage.setItem('refreshToken', response.refreshToken)
       localStorage.setItem('userId', response.userId.toString())
       localStorage.setItem('userEmail', response.email)
       localStorage.setItem('userType', response.userType)
-      debugger
+
       // 사업자 프로필에서 회사명 가져오기
       try {
         const profileResponse = await apiCall<{
           companyName: string
         }>(`/api/employer/profile/${response.userId}`, {
-          method: 'GET'
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${response.accessToken}`
+          }
         })
         localStorage.setItem('userName', profileResponse.companyName)
-        debugger
       } catch (profileError) {
         console.error('프로필 로딩 실패:', profileError)
         // 프로필 로딩 실패해도 로그인은 진행
       }
-      
+
       // Context 로그인 상태 업데이트
       login('employer')
-      
       navigate('/employer/jobs')
     } catch (error) {
       console.error('로그인 실패:', error)
