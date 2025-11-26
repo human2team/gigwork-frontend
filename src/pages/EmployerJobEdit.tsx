@@ -395,9 +395,13 @@ function EmployerJobEdit() {
     try {
       const requestData = {
         title: formData.title,
-        category: selectedJobSub?.nm || formData.category,
+        category: (selectedJobSub?.nm === '전체'
+          ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || formData.category)
+          : (selectedJobSub?.nm || formData.category)),
         categoryCode: selectedJobSub?.cd || '',
-        categoryName: selectedJobSub?.nm || formData.category,
+        categoryName: (selectedJobSub?.nm === '전체'
+          ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || formData.category)
+          : (selectedJobSub?.nm || formData.category)),
         company: formData.company,
         location: formData.location,
         region: selectedRegion,
@@ -487,26 +491,6 @@ function EmployerJobEdit() {
           </h2>
           
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
-                직무 제목 <span style={{ color: '#f44336' }}>*</span>
-              </label>
-              <input
-                type="text"
-                name="title"
-                value={formData.title}
-                onChange={handleChange}
-                placeholder="예: 데이터 입력 전문가"
-                required
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  fontSize: '16px'
-                }}
-              />
-            </div>
             <div style={{ position: 'relative' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
                 직업 카테고리 <span style={{ color: '#f44336' }}>*</span>
@@ -527,7 +511,17 @@ function EmployerJobEdit() {
                   justifyContent: 'space-between'
                 }}
               >
-                <span>{selectedJobSub?.nm || formData.category || '카테고리 선택'}</span>
+                <span>
+                  {(() => {
+                    const subNm = selectedJobSub?.nm
+                    if (subNm) {
+                      return subNm === '전체'
+                        ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || '전체')
+                        : subNm
+                    }
+                    return formData.category || '카테고리 선택'
+                  })()}
+                </span>
                 <ChevronDown size={18} color="#999" />
               </button>
               {showCategoryPopup && (
@@ -586,7 +580,9 @@ function EmployerJobEdit() {
                                 checked={selected}
                                 onChange={() => {
                                   setSelectedJobSub({ cd: sub.cd, nm: sub.nm })
-                                  setFormData(prev => ({ ...prev, category: sub.nm }))
+                                  const mainNm = jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || ''
+                                  const nameToSet = sub.nm === '전체' ? (mainNm || '전체') : sub.nm
+                                  setFormData(prev => ({ ...prev, category: nameToSet }))
                                   setShowCategoryPopup(false)
                                 }}
                               />
@@ -600,19 +596,16 @@ function EmployerJobEdit() {
                 </div>
               )}
             </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
-                회사명 <span style={{ color: '#f44336' }}>*</span>
+                직무 제목 <span style={{ color: '#f44336' }}>*</span>
               </label>
               <input
                 type="text"
-                name="company"
-                value={formData.company}
+                name="title"
+                value={formData.title}
                 onChange={handleChange}
-                placeholder="회사명을 입력하세요"
+                placeholder="예: 데이터 입력 전문가"
                 required
                 style={{
                   width: '100%',
@@ -625,45 +618,46 @@ function EmployerJobEdit() {
             </div>
           </div>
 
-          <div style={{ marginBottom: '20px', position: 'relative' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
-              위치 <span style={{ color: '#f44336' }}>*</span>
-            </label>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                onClick={() => { setShowRegionPopup(!showRegionPopup) }}
-                style={{
-                  padding: '12px',
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+            <div style={{ position: 'relative' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+                위치 <span style={{ color: '#f44336' }}>*</span>
+              </label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setShowRegionPopup(!showRegionPopup) }}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #e0e0e0',
+                    borderRadius: '6px',
+                    backgroundColor: '#ffffff',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    justifyContent: 'space-between'
+                  }}
+                >
+                  <span>{selectedRegion ? [selectedRegion, selectedDistrict, selectedDong].filter(Boolean).join(' ') : '지역 선택'}</span>
+                  <ChevronDown size={18} color="#999" />
+                </button>
+              </div>
+              {showRegionPopup && (
+                <div style={{
+                  position: 'absolute',
+                  top: 'calc(100% + 8px)',
+                  left: 0,
+                  width: 'min(900px, calc(100vw - 32px))',
+                  backgroundColor: '#fff',
                   border: '1px solid #e0e0e0',
-                  borderRadius: '6px',
-                  backgroundColor: '#ffffff',
-                  cursor: 'pointer',
-                  fontSize: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  minWidth: 260,
-                  justifyContent: 'space-between'
-                }}
-              >
-                <span>{selectedRegion ? [selectedRegion, selectedDistrict, selectedDong].filter(Boolean).join(' ') : '지역 선택'}</span>
-                <ChevronDown size={18} color="#999" />
-              </button>
-            </div>
-            {showRegionPopup && (
-              <div style={{
-                position: 'absolute',
-                top: 'calc(100% + 8px)',
-                left: 0,
-                width: 760,
-                backgroundColor: '#fff',
-                border: '1px solid #e0e0e0',
-                borderRadius: 8,
-                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                padding: 12,
-                zIndex: 20
-              }}>
+                  borderRadius: 8,
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  padding: 12,
+                  zIndex: 20
+                }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 320px', gap: 12 }}>
                   {/* 시/도 */}
                   <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
@@ -738,6 +732,27 @@ function EmployerJobEdit() {
                 </div>
               </div>
             )}
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+                회사명 <span style={{ color: '#f44336' }}>*</span>
+              </label>
+              <input
+                type="text"
+                name="company"
+                value={formData.company}
+                onChange={handleChange}
+                placeholder="회사명을 입력하세요"
+                required
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '6px',
+                  fontSize: '16px'
+                }}
+              />
+            </div>
           </div>
         </section>
 

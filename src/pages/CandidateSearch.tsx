@@ -23,10 +23,44 @@ function CandidateSearch() {
   // JobSearch 스타일 컨트롤 바용
   const [showRegionPopup, setShowRegionPopup] = useState(false)
   const [showJobPopup, setShowJobPopup] = useState(false)
-  const regionOptions = [
-    '전체','서울','경기','인천','부산','대구','광주','대전','울산','세종',
-    '강원','충북','충남','전북','전남','경북','경남','제주'
-  ]
+  // 지역(시/도/구/동) - OpenAPI 동적 로드 (JobSearch와 동일 패턴)
+  type RegionItem = { code: string; name: string; sido?: string; sgg?: string; umd?: string }
+  type DistrictItem = { code: string; name: string }
+  type DongItem = { code: string; name: string }
+  const [regions, setRegions] = useState<RegionItem[]>([])
+  const [districts, setDistricts] = useState<DistrictItem[]>([])
+  const [dongs, setDongs] = useState<DongItem[]>([])
+  const [selectedRegionCode, setSelectedRegionCode] = useState<string>('')
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState<string>('')
+  const [selectedDongCode, setSelectedDongCode] = useState<string>('')
+  useEffect(() => {
+    fetch('/api/regions')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setRegions(data.map((r: any) => ({
+            code: r.code, name: r.name, sido: r.sido, sgg: r.sgg, umd: r.umd
+          })))
+        } else {
+          setRegions([])
+        }
+      })
+      .catch(() => setRegions([]))
+  }, [])
+  useEffect(() => {
+    if (!selectedRegionCode) return
+    fetch(`/api/districts?region=${encodeURIComponent(selectedRegionCode)}`)
+      .then(res => res.json())
+      .then(data => { setDistricts(Array.isArray(data) ? data : []) })
+      .catch(() => setDistricts([]))
+  }, [selectedRegionCode])
+  useEffect(() => {
+    if (!selectedDistrictCode) return
+    fetch(`/api/dongs?district=${encodeURIComponent(selectedDistrictCode)}`)
+      .then(res => res.json())
+      .then(data => { setDongs(Array.isArray(data) ? data : []) })
+      .catch(() => setDongs([]))
+  }, [selectedDistrictCode])
   // 업직종 2단(백엔드 연동)
   type CategoryItem = { cd: string; nm: string }
   const [jobMainCats, setJobMainCats] = useState<CategoryItem[]>([])
@@ -147,7 +181,11 @@ function CandidateSearch() {
       }
     }
     fetchEmployerJobs()
-    // 이미 제안한 후보자 목록 불러오기 (로그인된 employerId 필요)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, locationFilter, licenseFilter, minSuitability])
+
+  // 이미 제안한 후보자 목록 불러오기 (로그인된 employerId 필요)
+  useEffect(() => {
     const fetchProposed = async () => {
       const currentEmployerId = employerProfileId || ''
       if (!currentEmployerId) {
@@ -155,11 +193,11 @@ function CandidateSearch() {
         return;
       }
       try {
-        // 가능한 엔드포인트 순회. 404를 줄이기 위해 가장 일반적인 쿼리파라미터 형태를 먼저 시도
+        // 가능한 엔드포인트 순회. 서버 구현에 맞게 우선순위 조정
         const tryUrls = [
-          `/api/proposals?employerId=${currentEmployerId}`,
           `/api/proposals/employer/${currentEmployerId}`,
-          `/api/proposals/employer/${currentEmployerId}/jobseekers`
+          `/api/proposals/employer/${currentEmployerId}/jobseekers`,
+          `/api/proposals?employerId=${currentEmployerId}`
         ];
         let fetched: any[] | null = null;
         let lastStatus: number | undefined = undefined;
@@ -199,8 +237,7 @@ function CandidateSearch() {
       }
     };
     fetchProposed();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, locationFilter, licenseFilter, minSuitability, employerUserId, employerProfileId, selectedJobId])
+  }, [employerProfileId])
 
   const getSuitabilityColor = (score: number) => {
     if (score >= 85) return '#4caf50'
@@ -250,11 +287,24 @@ function CandidateSearch() {
     return parts.join(' ')
   }
 
+  const normalizeKo = (s: string): string => {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/(특별자치도|특별자치시|광역시|특별시|자치구|시|군|구|도|동|읍|면)/g, '')
+  }
+
   const filteredCandidates = candidates.filter(candidate => {
     const matchesSearch = candidate.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          candidate.experience?.some((exp: string) => exp.toLowerCase().includes(searchQuery.toLowerCase()))
     const preferredText = getPreferredLocationText(candidate)
-    const matchesLocation = locationFilter === '전체' || preferredText.includes(locationFilter)
+    const matchesLocation = (() => {
+      if (locationFilter === '전체') return true
+      const nf = normalizeKo(locationFilter)
+      const np = normalizeKo(preferredText)
+      if (!nf) return true
+      return np.includes(nf) || nf.includes(np)
+    })()
     const matchesLicense = licenseFilter === '전체' || candidate.licenses?.some((license: string) => license.includes(licenseFilter))
     const matchesSuitability = candidate.suitability >= minSuitability
     // 업직종 카테고리 매칭(유연한 필드 대응)
@@ -320,7 +370,7 @@ function CandidateSearch() {
               gap: 6
             }}
           >
-            지역{locationFilter !== '전체' ? `(${locationFilter})` : ''}
+            {locationFilter === '전체' ? '지역' : locationFilter}
             <ChevronDown size={16} />
           </button>
           {showRegionPopup && (
@@ -328,7 +378,7 @@ function CandidateSearch() {
               position: 'absolute',
               top: 'calc(100% + 8px)',
               left: 0,
-              width: 260,
+              width: 'min(760px, calc(100vw - 32px))',
               backgroundColor: '#fff',
               border: '1px solid #e0e0e0',
               borderRadius: 8,
@@ -337,34 +387,104 @@ function CandidateSearch() {
               zIndex: 10
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 12, color: '#999' }}>한 지역 선택</div>
+                <div style={{ fontSize: 12, color: '#999' }}>지역 선택</div>
                 <button
                   type="button"
-                  onClick={() => setLocationFilter('전체')}
+                  onClick={() => {
+                    setSelectedRegionCode(''); setSelectedDistrictCode(''); setSelectedDongCode('');
+                    setDistricts([]); setDongs([]); setLocationFilter('전체');
+                  }}
                   style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
                 >
                   초기화
                 </button>
               </div>
-              <div style={{ overflowY: 'auto', maxHeight: 180 }}>
-                {regionOptions.map(r => (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => { setLocationFilter(r); setShowRegionPopup(false) }}
-                    style={{
-                      width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
-                      background: locationFilter === r ? '#e3f2fd' : 'transparent',
-                      color: locationFilter === r ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
-                    }}
-                  >
-                    {r}
-                  </button>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 1fr', gap: 12 }}>
+                {/* 시/도 */}
+                <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                  {regions.map(region => (
+                    <button
+                      key={region.code}
+                      type="button"
+                      onClick={() => { 
+                        setSelectedRegionCode(region.code); 
+                        setSelectedDistrictCode(''); 
+                        setSelectedDongCode('');
+                        setDistricts([]); setDongs([]); 
+                        // 즉시 매칭: 시/도 선택만으로도 필터 적용
+                        setLocationFilter(region.name || '전체')
+                      }}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                        background: selectedRegionCode === region.code ? '#e3f2fd' : 'transparent',
+                        color: selectedRegionCode === region.code ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                      }}
+                    >
+                      {region.name}
+                    </button>
+                  ))}
+                </div>
+                {/* 구/군 */}
+                <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
+                  {districts.map(d => (
+                    <button
+                      key={d.code}
+                      type="button"
+                      onClick={() => { 
+                        setSelectedDistrictCode(d.code); 
+                        setSelectedDongCode(''); 
+                        setDongs([]);
+                        // 즉시 매칭: 시/도 + 구/군 조합으로 필터 적용
+                        const r = regions.find(r => r.code === selectedRegionCode)?.name || ''
+                        const display = [r, d.name].filter(Boolean).join(' ') || d.name
+                        setLocationFilter(display)
+                      }}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '8px 10px', border: 'none',
+                        background: selectedDistrictCode === d.code ? '#e3f2fd' : 'transparent',
+                        color: selectedDistrictCode === d.code ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                      }}
+                    >
+                      {d.name}
+                    </button>
+                  ))}
+                </div>
+                {/* 동 */}
+                <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                  {dongs.map(dg => (
+                    <button
+                      key={dg.code}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDongCode(dg.code);
+                        // 즉시 매칭: 시/도 + 구/군 + 동 조합으로 필터 적용
+                        const r = regions.find(r => r.code === selectedRegionCode)?.name || ''
+                        const g = districts.find(d => d.code === selectedDistrictCode)?.name || ''
+                        const display = [r, g, dg.name].filter(Boolean).join(' ')
+                        setLocationFilter(display || dg.name)
+                      }}
+                      style={{
+                        width: '100%', textAlign: 'left', padding: '6px 8px', border: 'none',
+                        background: selectedDongCode === dg.code ? '#e3f2fd' : 'transparent',
+                        color: selectedDongCode === dg.code ? '#2196f3' : '#333', cursor: 'pointer', borderRadius: 6
+                      }}
+                    >
+                      {dg.name}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>
                 <button
-                  onClick={() => setShowRegionPopup(false)}
+                  type="button"
+                  onClick={() => {
+                    const r = regions.find(r => r.code === selectedRegionCode)?.name || ''
+                    const g = districts.find(d => d.code === selectedDistrictCode)?.name || ''
+                    const d = dongs.find(dd => dd.code === selectedDongCode)?.name || ''
+                    const display = [r, g, d].filter(Boolean).join(' ') || '전체'
+                    setLocationFilter(display)
+                    setShowRegionPopup(false)
+                  }}
                   style={{ padding: '8px 14px', border: 'none', borderRadius: 6, background: '#2196f3', color: '#fff', cursor: 'pointer' }}
                 >
                   적용
@@ -388,7 +508,18 @@ function CandidateSearch() {
               gap: 6
             }}
           >
-            업직종{selectedJobSubcats.length > 0 ? `(${selectedJobSubcats.length})` : ''}
+            {(() => {
+              const mainNm = (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm) || ''
+              let display = ''
+              if (selectedJobSubcats.length > 0) {
+                display = `${selectedJobSubcats.slice(0, 2).join(', ')}${selectedJobSubcats.length > 2 ? ` 외 ${selectedJobSubcats.length - 2}개` : ''}`
+              } else if (selectAllSubcats && mainNm) {
+                display = mainNm
+              } else if (selectedJobMainCd && mainNm) {
+                display = mainNm
+              }
+              return display || '업직종'
+            })()}
             <ChevronDown size={16} />
           </button>
           {showJobPopup && (

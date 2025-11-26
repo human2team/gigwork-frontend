@@ -392,7 +392,13 @@ function JobSearch() {
               gap: 6
             }}
           >
-            지역
+          {(() => {
+            const r = regions.find(r => r.code === selectedRegionCode)?.name || ''
+            const d = districts.find(d => d.code === selectedDistrictCode)?.name || ''
+            const g = dongs.find(dd => dd.code === selectedDongCode)?.name || ''
+            const label = [r, d, g].filter(Boolean).join(' ')
+            return label || '지역'
+          })()}
             <ChevronDown size={16} />
           </button>
           {showRegionPopup && (
@@ -400,7 +406,7 @@ function JobSearch() {
               position: 'absolute',
               top: 'calc(100% + 8px)',
               left: 0,
-              width: 760,
+              width: 'min(760px, calc(100vw - 32px))',
               backgroundColor: '#fff',
               border: '1px solid #e0e0e0',
               borderRadius: 8,
@@ -415,7 +421,7 @@ function JobSearch() {
                   style={{ border: 'none', background: 'transparent', color: '#2196f3', cursor: 'pointer', fontSize: 12 }}
                 >초기화</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 320px', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '200px 240px 1fr', gap: 12 }}>
                 {/* 시/도 */}
                 <div style={{ borderRight: '1px solid #eee', overflowY: 'auto', maxHeight: 220 }}>
                   {filteredRegions.map(region => (
@@ -465,7 +471,7 @@ function JobSearch() {
                   ))}
                 </div>
                 {/* 동 */}
-                <div style={{ overflowY: 'auto', maxHeight: 220 }}>
+                <div style={{ overflowY: 'auto', overflowX: 'hidden', maxHeight: 220, minWidth: 0 }}>
                   {dongs.map(dong => (
                     <label key={dong.code} style={{
                       display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px',
@@ -514,7 +520,18 @@ function JobSearch() {
               gap: 6
             }}
           >
-            업직종{selectedJobSubcats.length > 0 ? `(${selectedJobSubcats.length})` : ''}
+          {(() => {
+            const mainNm = (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm) || ''
+            let display = ''
+            if (selectedJobSubcats.length > 0) {
+              display = `${selectedJobSubcats.slice(0, 2).join(', ')}${selectedJobSubcats.length > 2 ? ` 외 ${selectedJobSubcats.length - 2}개` : ''}`
+            } else if (selectAllSubcats && mainNm) {
+              display = mainNm
+            } else if (selectedJobMainCd && mainNm) {
+              display = mainNm
+            }
+            return display || '업직종'
+          })()}
             <ChevronDown size={16} />
           </button>
           {showJobPopup && (
@@ -740,7 +757,7 @@ function JobSearch() {
                   </button>
                 </div>
                 {/* 근무지 */}
-                <div style={{ fontSize: '14px', color: '#555' }}>{job.location}</div>
+                <div style={{ fontSize: '14px', color: '#555', marginLeft: -50 }}>{job.location}</div>
                 {/* 근무시간 */}
                 <div style={{ fontSize: '14px', color: '#555' }}>{workTime}</div>
                 {/* 급여 */}
