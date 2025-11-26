@@ -161,41 +161,142 @@ function Chatbot() {
     setMessages(prev => [...prev, botMessage]);
   }
 
-const addSearchCondition = async (userInput: string, userPref: UserJobPreferences): Promise<{ 
+  // helper: condition 필드들을 UI용 문자열로 변환
+  const formatConditionValue = (val: any, key?: string): string | null => {
+    if (val === null || val === undefined) return null
+    // 문자열/숫자는 그대로
+    if (typeof val === 'string' || typeof val === 'number') {
+      // work_days 가 문자열 배열처럼 들어오는 경우(단일 문자열)도 처리
+      if (key === 'work_days' && typeof val === 'string') {
+        // try parse as comma-separated or single date
+        return val
+      }
+      return String(val)
+    }
+    // 배열: 요소별로 포맷 후 모두 join
+    if (Array.isArray(val)) {
+      const items = val.map(item => {
+        // 날짜 배열 (work_days) -> YYYY-MM-DD 형식으로 보이게
+        if (key === 'work_days' && (typeof item === 'string' || typeof item === 'number')) {
+          const d = new Date(String(item))
+          if (!isNaN(d.getTime())) {
+            return d.toISOString().slice(0, 10) // YYYY-MM-DD
+          }
+          return String(item)
+        }
+        // place / category 항목들이 객체인 경우
+        if (typeof item === 'object' && item !== null) {
+          // place object: region1/region2 등 합치기
+          if ('region1' in item || 'region2' in item) {
+            const parts: string[] = []
+            if (item.region1) parts.push(String(item.region1))
+            if (item.region2) parts.push(String(item.region2))
+            return parts.join(' ')
+          }
+          // category object: category1/category2 등 합치기
+          const catKeys = Object.keys(item).filter(k => k.toLowerCase().includes('category') || k.toLowerCase().includes('cat'))
+          if (catKeys.length > 0) {
+            return catKeys.map(k => item[k]).filter(Boolean).join(' / ')
+          }
+          // 일반 객체는 값들로 합치기
+          return Object.values(item).map(v => (v === null || v === undefined) ? '' : String(v)).filter(Boolean).join(' ')
+        }
+        // primitive
+        return String(item)
+      }).filter(Boolean)
+      return items.join(', ')
+    }
+    // object: place/category 처리
+    if (typeof val === 'object') {
+      if ('region1' in val || 'region2' in val) {
+        const parts: string[] = []
+        if (val.region1) parts.push(String(val.region1))
+        if (val.region2) parts.push(String(val.region2))
+        return parts.join(' ')
+      }
+      const catKeys = Object.keys(val).filter(k => k.toLowerCase().includes('category') || k.toLowerCase().includes('cat'))
+      if (catKeys.length > 0) {
+        return catKeys.map(k => val[k]).filter(Boolean).join(' / ')
+      }
+      return Object.values(val).map(v => (v === null || v === undefined) ? '' : String(v)).filter(Boolean).join(' ')
+    }
+    return null
+  }
+
+  const addSearchCondition = async (userInput: string, userPref: UserJobPreferences): Promise<{ 
     text: string; 
     action?: { label: string; path: string }; 
     preferences?: Partial<UserJobPreferences> 
   }> => {
     try {
       const res = await axios.post('http://localhost:8080/chat', {
-        text: userInput, //"나이는 27세. 성별은 남자. 시급은 10000원임", 전국 어느 지역이든 상관이 없습니다만 서울 지역이 1순위이긴 합니다.
-        condition: userPref, //search가 true일 때도 당연히 필요하고 false일 때도 fastapi에서 여기서 넘어간 조건을 기본으로 추가된 조건을 병합하므로 항상 필요한 파라미터임
+        text: userInput,
+        condition: userPref,
         search: false
       })
+
       console.log('백엔드 응답:', res.data);
-      const condition = res.data
-      debugger
-      const extractedPreferences: Partial<UserJobPreferences> = condition
-      if (Object.keys(extractedPreferences).length > 0) {
-        let confirmText = '입력하신 조건을 오른쪽 패널에 추가했습니다:\n\n'
-        if (extractedPreferences.place) confirmText += `📍 지역: ${extractedPreferences.place}\n`
-        if (extractedPreferences.category) confirmText += `💼 직종: ${extractedPreferences.category}\n`
-        if (extractedPreferences.work_days) confirmText += `📅 근무일: ${extractedPreferences.work_days}\n`
-        if (extractedPreferences.hourly_wage) confirmText += `💰 시급: ${extractedPreferences.hourly_wage.toLocaleString()}원\n`
-        if (extractedPreferences.start_time) confirmText += `⏰ 시간: ${extractedPreferences.start_time} ~ ${extractedPreferences.end_time}\n`
-        confirmText += "추가 조건이 있으시면 말씀해주세요. 없으시면 아래 '조건으로 검색' 버튼을 눌러주세요!"
+
+      // FastAPI 응답 읽기
+      const rawResponse = res.data.rawResponse || res.data;  
+      const state = rawResponse.state || {};
+
+      // llm_response가 객체일 수 있으므로 문자열로 안전 변환
+      let llmText: string
+      if (typeof state.llm_response === 'string' || typeof state.llm_response === 'number') {
+        llmText = String(state.llm_response)
+      } else if (state.llm_response && typeof state.llm_response === 'object') {
+        llmText = typeof state.llm_response.text === 'string'
+          ? state.llm_response.text
+          : JSON.stringify(state.llm_response)
+      } else {
+        llmText = "응답을 이해하지 못했어요"
+      }
+
+      // condition 필드 정규화: 객체/배열 -> 문자열
+      const rawCond = state.condition ? state.condition : {}
+      const extractedPreferences: Partial<UserJobPreferences> = {}
+
+      // iterate keys in rawCond and normalize
+      Object.keys(rawCond).forEach(k => {
+        const key = k as keyof UserJobPreferences
+        const val = rawCond[key]
+        // 숫자 필드인 hourly_wage는 숫자로 변환 시도
+        if (key === 'hourly_wage') {
+          if (typeof val === 'number') {
+            extractedPreferences.hourly_wage = val
+          } else if (typeof val === 'string') {
+            const parsed = parseInt(val.replace(/[^0-9]/g, ''), 10)
+            extractedPreferences.hourly_wage = isNaN(parsed) ? null : parsed
+          } else {
+            extractedPreferences.hourly_wage = null
+          }
+        } else {
+          // place, category, work_days, requirements 등은 문자열로 변환
+          const formatted = formatConditionValue(val, String(key))
+          ;(extractedPreferences as any)[key] = formatted
+        }
+      })
+
+      // preferences가 의미있는 값이면 반환
+      if (Object.keys(extractedPreferences).some(k => {
+        const v = extractedPreferences[k as keyof UserJobPreferences]
+        return v !== null && v !== undefined && v !== ''
+      })) {
         return {
-          text: confirmText,
+          text: llmText,
           preferences: extractedPreferences
         }
       }
-      return { //기본 응답
-          text: '원하시는 일자리 조건을 더 구체적으로 말씀해주세요.\n\n예시:\n• "강남에서 주5일 서빙 일자리 찾아줘"\n• "시급 2만원 이상 카페 알바"\n• "주말만 가능한 배달 일자리"\n\n또는 일반적인 질문도 가능합니다:\n• 일자리 추천 받기\n• 프로필 관리 방법\n• 적합도 점수 설명'
-      }
-    } catch (ex) {
-      alert("addSearchCondition: " + ex.message)
-    }   
+
+      return { text: llmText }
+
+    } catch (ex: any) {
+      alert("addSearchCondition: " + ex.message);
+      return { text: "서버 오류가 발생했습니다." };
+    }
   }
+
 
   const handleSearch = async () => {
     setIsSearching(true)
@@ -307,11 +408,11 @@ const addSearchCondition = async (userInput: string, userPref: UserJobPreference
     // 정보가 추출되었으면 확인 메시지 반환
     if (Object.keys(extractedPreferences).length > 0) {
       let confirmText = '입력하신 조건을 확인했습니다:\n\n'
-      if (extractedPreferences.place) confirmText += `📍 지역: ${extractedPreferences.place}\n`
-      if (extractedPreferences.category) confirmText += `💼 직종: ${extractedPreferences.category}\n`
-      if (extractedPreferences.work_days) confirmText += `📅 근무일: ${extractedPreferences.work_days}\n`
-      if (extractedPreferences.hourly_wage) confirmText += `💰 시급: ${extractedPreferences.hourly_wage.toLocaleString()}원\n`
-      if (extractedPreferences.start_time) confirmText += `⏰ 시간: ${extractedPreferences.start_time} ~ ${extractedPreferences.end_time}\n`
+      if (extractedPreferences.place) confirmText += `📍 지역: ${formatConditionValue(extractedPreferences.place, 'place')}\n`
+      if (extractedPreferences.category) confirmText += `💼 직종: ${formatConditionValue(extractedPreferences.category, 'category')}\n`
+      if (extractedPreferences.work_days) confirmText += `📅 근무일: ${formatConditionValue(extractedPreferences.work_days, 'work_days')}\n`
+      if (extractedPreferences.hourly_wage) confirmText += `💰 시급: ${Number(extractedPreferences.hourly_wage).toLocaleString()}원\n`
+      if (extractedPreferences.start_time) confirmText += `⏰ 시간: ${formatConditionValue(extractedPreferences.start_time, 'start_time')} ~ ${formatConditionValue(extractedPreferences.end_time, 'end_time')}\n`
       
       confirmText += '\n추가 조건이 있으시면 말씀해주세요. 없으시면 아래 검색 버튼을 눌러주세요!'
 
