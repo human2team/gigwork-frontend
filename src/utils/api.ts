@@ -59,6 +59,7 @@ export class ApiException extends Error implements ApiError {
 /**
  * API 호출 래퍼 함수
  * 에러 처리 및 타임아웃 지원
+ * JWT 인증 자동 처리
  */
 export async function apiCall<T>(
   url: string,
@@ -71,13 +72,70 @@ export async function apiCall<T>(
   // 환경 변수에서 API URL 가져오기
   const apiUrl = createApiUrl(url)
 
+  // localStorage에서 Access Token 가져오기
+  const accessToken = localStorage.getItem('accessToken')
+  
+  // 기본 헤더 설정
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...((options.headers as HeadersInit) || {})
+  }
+  
+  // 토큰이 있으면 Authorization 헤더 추가
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`
+  }
+
   try {
     const response = await fetch(apiUrl, {
       ...options,
+      headers,
       signal: controller.signal
     })
 
     clearTimeout(timeoutId)
+
+    // 401 Unauthorized - 토큰 만료 또는 인증 실패
+    if (response.status === 401) {
+      console.warn('[JWT 인증 오류] 401 Unauthorized 발생:', apiUrl)
+      
+      // Refresh Token으로 재시도
+      const newToken = await refreshAccessToken()
+      if (newToken) {
+        console.log('[JWT 인증] Refresh Token으로 재시도 성공')
+        // 새 토큰으로 재시도
+        const retryHeaders = {
+          ...headers,
+          'Authorization': `Bearer ${newToken}`
+        }
+        
+        const retryResponse = await fetch(apiUrl, {
+          ...options,
+          headers: retryHeaders,
+          signal: controller.signal
+        })
+        
+        if (retryResponse.ok) {
+          const contentType = retryResponse.headers.get('content-type')
+          if (contentType && contentType.includes('application/json')) {
+            return await retryResponse.json()
+          }
+          return await retryResponse.text() as unknown as T
+        }
+      }
+      
+      // Refresh Token도 실패하면 사용자에게 알림 후 로그아웃
+      console.error('[JWT 인증 실패] 세션이 만료되었습니다. 로그인 페이지로 이동합니다.')
+      
+      // 사용자에게 알림
+      alert('⚠️ 세션이 만료되었습니다.\n다시 로그인해주세요.')
+      
+      // 로그아웃 처리
+      localStorage.clear()
+      window.location.href = '/jobseeker/login'
+      
+      throw new ApiException('세션이 만료되었습니다. 다시 로그인해주세요.', 401, 'Unauthorized')
+    }
 
     if (!response.ok) {
       let errorData
@@ -182,6 +240,56 @@ export function safeLocalStorageRemove(key: string): boolean {
   } catch (error) {
     console.error(`Failed to remove item from localStorage (${key}):`, error)
     return false
+  }
+}
+
+/**
+ * Access Token 갱신 함수
+ * Refresh Token을 사용하여 새로운 Access Token 발급
+ */
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('refreshToken')
+  if (!refreshToken) {
+    console.warn('[JWT 인증] Refresh Token이 없습니다.')
+    return null
+  }
+  
+  try {
+    console.log('[JWT 인증] Refresh Token으로 Access Token 갱신 시도...')
+    const apiUrl = createApiUrl('/api/auth/refresh')
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ refreshToken })
+    })
+    
+    if (!response.ok) {
+      console.error('[JWT 인증] Token 갱신 실패:', response.status, response.statusText)
+      
+      // 403 Forbidden 또는 401 Unauthorized - Refresh Token도 만료됨
+      if (response.status === 401 || response.status === 403) {
+        alert('⚠️ 로그인 세션이 완전히 만료되었습니다.\n다시 로그인해주세요.')
+      }
+      
+      return null
+    }
+    
+    const data = await response.json()
+    
+    console.log('[JWT 인증] Access Token 갱신 성공')
+    
+    // 새 토큰 저장
+    localStorage.setItem('accessToken', data.accessToken)
+    if (data.refreshToken) {
+      localStorage.setItem('refreshToken', data.refreshToken)
+    }
+    
+    return data.accessToken
+  } catch (error) {
+    console.error('[JWT 인증] 토큰 갱신 중 오류 발생:', error)
+    return null
   }
 }
 

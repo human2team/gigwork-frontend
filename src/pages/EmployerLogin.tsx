@@ -44,7 +44,7 @@ function EmployerLogin() {
       localStorage.setItem('userId', response.userId.toString())
       localStorage.setItem('userEmail', response.email)
       localStorage.setItem('userType', response.userType)
-      
+      debugger
       // 사업자 프로필에서 회사명 가져오기
       try {
         const profileResponse = await apiCall<{
@@ -53,6 +53,7 @@ function EmployerLogin() {
           method: 'GET'
         })
         localStorage.setItem('userName', profileResponse.companyName)
+        debugger
       } catch (profileError) {
         console.error('프로필 로딩 실패:', profileError)
         // 프로필 로딩 실패해도 로그인은 진행

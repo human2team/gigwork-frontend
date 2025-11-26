@@ -23,6 +23,8 @@ function JobseekerLogin() {
         email: string
         userType: string
         message: string
+        accessToken: string
+        refreshToken: string
       }>('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -40,14 +42,16 @@ function JobseekerLogin() {
         return
       }
       
-      // userId를 localStorage에 저장
+      // JWT 토큰과 사용자 정보를 localStorage에 저장
+      localStorage.setItem('accessToken', response.accessToken)
+      localStorage.setItem('refreshToken', response.refreshToken)
       localStorage.setItem('userId', response.userId.toString())
       localStorage.setItem('userEmail', response.email)
       localStorage.setItem('userType', response.userType)
       
       // 구직자 전체 프로필 가져오기 및 저장
       try {
-        const profileResponse = await apiCall(`/api/jobseeker/profile/${response.userId}`, {
+        const profileResponse = await apiCall<any>(`/api/jobseeker/profile/${response.userId}`, {
           method: 'GET'
         })
         localStorage.setItem('jobseekerProfile', JSON.stringify(profileResponse))
@@ -57,10 +61,11 @@ function JobseekerLogin() {
         console.error('프로필 로딩 실패:', profileError)
         // 프로필 로딩 실패해도 로그인은 진행
       }
-
+      
       // Context 로그인 상태 업데이트
       login('jobseeker')
-
+      
+      // 페이지 이동
       navigate('/jobseeker/search')
     } catch (error) {
       console.error('로그인 실패:', error)
