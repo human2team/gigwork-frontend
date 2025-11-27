@@ -245,8 +245,8 @@ function Profile() {
         }
         const physicalInfo = {
           strength: strengthKorean,
-          height: response.physicalAttributes?.height || 175,
-          weight: response.physicalAttributes?.weight || 70
+          height: (response.physicalAttributes?.height ?? '') as number | '',
+          weight: (response.physicalAttributes?.weight ?? '') as number | ''
         };
         setPhysicalData(physicalInfo);
         setSavedPhysicalData(physicalInfo);
@@ -671,6 +671,11 @@ function Profile() {
       alert('이름, 이메일, 전화번호, 생년월일은 필수 입력 항목입니다.')
       return
     }
+    // 학력사항 필수
+    if (!personalInfo.education) {
+      alert('학력사항은 필수 입력 항목입니다.')
+      return
+    }
     
     // 이메일 형식 검증
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -686,13 +691,28 @@ function Profile() {
       return
     }
 
-    // 자기소개 검증
-    if (personalInfo.introduction && personalInfo.introduction.length < 20) {
-      alert('자기소개는 최소 20자 이상 입력해주세요.')
+    // 자기소개 검증 (5자 이상 20자 이하) - 필수
+    if (!personalInfo.introduction || personalInfo.introduction.length < 5) {
+      alert('자기소개는 최소 5자 이상 입력해주세요.')
       return
     }
-    if (personalInfo.introduction && personalInfo.introduction.length > 1000) {
-      alert('자기소개는 최대 1000자까지 입력 가능합니다.')
+    if (personalInfo.introduction.length > 20) {
+      alert('자기소개는 최대 20자까지 입력 가능합니다.')
+      return
+    }
+
+    // 희망근무조건 필수: 기본값(전체/무관) 유지 + 선택 없음이면 막기
+    const hasMeaningfulRegion =
+      (personalInfo.preferredRegion && personalInfo.preferredRegion !== '전체') ||
+      (personalInfo.preferredDistrict && personalInfo.preferredDistrict !== '전체') ||
+      (personalInfo.preferredDong && personalInfo.preferredDong !== '전체')
+    const hasMeaningfulWork =
+      (personalInfo.workDuration && personalInfo.workDuration !== '무관') ||
+      (personalInfo.workDays && personalInfo.workDays !== '무관') ||
+      (personalInfo.workTime && personalInfo.workTime !== '무관')
+    const hasDesiredCategories = desiredJobSubcats && desiredJobSubcats.length > 0
+    if (!hasMeaningfulRegion && !hasMeaningfulWork && !hasDesiredCategories) {
+      alert('희망근무조건은 최소 1개 이상(지역/근무조건/희망 업직종) 선택해 주세요.')
       return
     }
     
@@ -790,14 +810,14 @@ function Profile() {
   
   const [physicalData, setPhysicalData] = useState({
     strength: '중' as '상' | '중' | '하',
-    height: 175,
-    weight: 70
+    height: '' as number | '',
+    weight: '' as number | ''
   })
 
   const [savedPhysicalData, setSavedPhysicalData] = useState({
     strength: '중' as '상' | '중' | '하',
-    height: 175,
-    weight: 70
+    height: '' as number | '',
+    weight: '' as number | ''
   })
 
   const [isSavingPhysical, setIsSavingPhysical] = useState(false)
@@ -841,8 +861,8 @@ function Profile() {
           workDays: personalInfo.workDays,
           workTime: personalInfo.workTime,
           muscleStrength: muscleStrength,
-          height: physicalData.height,
-          weight: physicalData.weight,
+          height: physicalData.height === '' ? null : physicalData.height,
+          weight: physicalData.weight === '' ? null : physicalData.weight,
           strengths: personalInfo.strengths.join(','),
           mbti: personalInfo.mbti,
           introduction: personalInfo.introduction,
@@ -1129,7 +1149,7 @@ function Profile() {
             <div>
               <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <User size={16} color="#2196f3" />
-                이름
+                이름 <span style={{ color: '#f44336' }}>*</span>
               </label>
               <input
                 type="text"
@@ -1151,7 +1171,7 @@ function Profile() {
             <div>
               <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Mail size={16} color="#4caf50" />
-                이메일
+                이메일 <span style={{ color: '#f44336' }}>*</span>
               </label>
               <input
                 type="email"
@@ -1173,7 +1193,7 @@ function Profile() {
             <div>
               <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Phone size={16} color="#ff9800" />
-                전화번호
+                전화번호 <span style={{ color: '#f44336' }}>*</span>
               </label>
               <input
                 type="tel"
@@ -1195,7 +1215,7 @@ function Profile() {
             <div>
               <label style={{ marginBottom: '8px', fontSize: '14px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Calendar size={16} color="#9c27b0" />
-                생년월일
+                생년월일 <span style={{ color: '#f44336' }}>*</span>
               </label>
               <input
                 type="date"
@@ -1268,11 +1288,11 @@ function Profile() {
           <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e0e0e0' }}>
             <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <GraduationCap size={20} />
-              학력사항
+              학력사항 <span style={{ color: '#f44336', fontWeight: 700 }}>*</span>
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '800px' }}>
               <div>
-                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>최종학력</label>
+                <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>최종학력 <span style={{ color: '#f44336' }}>*</span></label>
                 <select
                   value={personalInfo.education}
                   onChange={(e) => setPersonalInfo({ ...personalInfo, education: e.target.value })}
@@ -1319,7 +1339,7 @@ function Profile() {
           <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e0e0e0' }}>
             <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Briefcase size={20} color="#2196f3" />
-              희망근무조건
+              희망근무조건 <span style={{ color: '#f44336', fontWeight: 700 }}>*</span>
             </h3>
               <div style={{ marginBottom: '24px' }}>
               <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>지역선택</h4>
@@ -1885,18 +1905,18 @@ function Profile() {
           <div style={{ marginTop: '32px', paddingTop: '32px', borderTop: '1px solid #e0e0e0' }}>
             <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <MessageSquare size={20} color="#4caf50" />
-              자기소개
+              자기소개 <span style={{ color: '#f44336', fontWeight: 700 }}>*</span>
             </h3>
             <div style={{ maxWidth: '800px' }}>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
-                자기소개를 입력해 주세요. (최소 20자 필수, 최대 1000자)
+                자기소개를 입력해 주세요. (최소 5자, 최대 20자)
               </label>
               <textarea
                 value={personalInfo.introduction}
                 onChange={(e) => setPersonalInfo({ ...personalInfo, introduction: e.target.value })}
                 placeholder="자기소개를 입력해주세요..."
                 rows={8}
-                maxLength={1000}
+                maxLength={20}
                 style={{
                   width: '100%',
                   padding: '12px',
@@ -1908,14 +1928,14 @@ function Profile() {
                 }}
               />
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '8px', fontSize: '14px', color: '#666' }}>
-                <span style={{ color: personalInfo.introduction.length < 20 && personalInfo.introduction.length > 0 ? '#f44336' : '#666' }}>
-                  {personalInfo.introduction.length < 20 && personalInfo.introduction.length > 0 
-                    ? `최소 20자 이상 입력해주세요. (현재 ${personalInfo.introduction.length}자)`
-                    : personalInfo.introduction.length >= 20
+                <span style={{ color: (personalInfo.introduction.length > 0 && (personalInfo.introduction.length < 5 || personalInfo.introduction.length > 20)) ? '#f44336' : '#666' }}>
+                  {personalInfo.introduction.length > 0 && personalInfo.introduction.length < 5 
+                    ? `최소 5자 이상 입력해주세요. (현재 ${personalInfo.introduction.length}자)`
+                    : personalInfo.introduction.length > 20
                     ? `✓ ${personalInfo.introduction.length}자`
-                    : `0자 / 최소 20자`}
+                    : `0자 / 최소 5자`}
                 </span>
-                <span>{personalInfo.introduction.length} / 1000자</span>
+                <span>{personalInfo.introduction.length} / 20자</span>
               </div>
             </div>
           </div>
@@ -2681,8 +2701,11 @@ function Profile() {
                 <input
                   type="number"
                   min="0"
-                  value={physicalData.height}
-                  onChange={(e) => setPhysicalData({ ...physicalData, height: parseInt(e.target.value) })}
+                  value={physicalData.height === '' ? '' : physicalData.height}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setPhysicalData({ ...physicalData, height: v === '' ? '' : parseInt(v) })
+                  }}
                   style={{
                     width: '100%',
                     padding: '12px',
@@ -2697,8 +2720,11 @@ function Profile() {
                 <input
                   type="number"
                   min="0"
-                  value={physicalData.weight}
-                  onChange={(e) => setPhysicalData({ ...physicalData, weight: parseInt(e.target.value) })}
+                  value={physicalData.weight === '' ? '' : physicalData.weight}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setPhysicalData({ ...physicalData, weight: v === '' ? '' : parseInt(v) })
+                  }}
                   style={{
                     width: '100%',
                     padding: '12px',

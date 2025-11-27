@@ -268,9 +268,24 @@ function CandidateSearch() {
         const res = await fetch(`/api/employer/jobs/${currentEmployerId}`)
         if (res.ok) {
           const data = await res.json()
-          setJobs(Array.isArray(data) ? data : [])
-          if (Array.isArray(data) && data.length > 0 && !selectedJobId) {
-            setSelectedJobId(String(data[0].id))
+          const list: any[] = Array.isArray(data) ? data : []
+          // 마감된 공고 제외
+          const open = list.filter((j: any) => {
+            const st = j.status || j.jobStatus || j.postingStatus
+            const dl = j.deadline || j.jobDeadline || j.job_deadline
+            // 임시: 로컬 함수는 아래에 정의, 아직 없으면 true로 통과 (다음 패치에서 함수 추가)
+            const d = new Date(dl || '')
+            const today = new Date(); d.setHours(0,0,0,0); today.setHours(0,0,0,0)
+            const closed = String(st || '').toUpperCase() === 'CLOSED' || (dl && !isNaN(d.getTime()) && d.getTime() < today.getTime())
+            return !closed
+          })
+          setJobs(open)
+          if (open.length > 0) {
+            if (!selectedJobId || !open.some(j => String(j.id) === String(selectedJobId))) {
+              setSelectedJobId(String(open[0].id))
+            }
+          } else {
+            setSelectedJobId('')
           }
         } else {
           setJobs([])
@@ -357,6 +372,343 @@ function CandidateSearch() {
     return '#f44336'
   }
 
+  // 문자열 정규화(한/영, 공백/구분자 제거, 소문자)
+  const normalize = (s: any): string => {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/\s+/g, '')
+      .replace(/[·.,/\\\-_|]+/g, '')
+  }
+
+  // 성별/나이 매칭 보조
+  const normalizeGender = (g: any): 'M' | 'F' | '' => {
+    const s = String(g || '').trim().toLowerCase()
+    if (!s || s === '무관') return ''
+    if (['m', 'male', '남', '남성', '남자'].includes(s)) return 'M'
+    if (['f', 'female', '여', '여성', '여자'].includes(s)) return 'F'
+    return ''
+  }
+  const parseJobAgeRange = (ageRaw: any): { min?: number; max?: number } | null => {
+    const s = String(ageRaw || '').trim()
+    if (!s || s === '무관') return null
+    const decade = s.match(/^(\d{2})\s*대$/)
+    if (decade) {
+      const base = parseInt(decade[1], 10)
+      return { min: base, max: base + 9 }
+    }
+    const range = s.match(/^(\d{2,3})\s*~\s*(\d{2,3})$/)
+    if (range) {
+      return { min: parseInt(range[1], 10), max: parseInt(range[2], 10) }
+    }
+    const ge = s.match(/^(\d{2,3})\s*세\s*이상$/)
+    if (ge) return { min: parseInt(ge[1], 10) }
+    const le = s.match(/^(\d{2,3})\s*세\s*이하$/)
+    if (le) return { max: parseInt(le[1], 10) }
+    if (/^\d{2,3}$/.test(s)) {
+      const n = parseInt(s, 10)
+      return { min: n, max: n }
+    }
+    return null
+  }
+  const isAgeInRange = (age?: number, range?: { min?: number; max?: number } | null): boolean => {
+    if (!Number.isFinite(age || NaN) || !range) return false
+    if (range.min != null && (age as number) < range.min) return false
+    if (range.max != null && (age as number) > range.max) return false
+    return true
+  }
+
+  // 현재 선택된 공고 정보에서 매칭에 사용할 필드 추출
+  const getSelectedJob = () => jobs.find(j => String(j.id) === String(selectedJobId))
+  const getJobFields = (job: any) => {
+    if (!job) return { categoryName: '', location: '', region: '', district: '', dong: '', requirements: [] as string[], qualifications: [] as string[], description: '', gender: '', age: '', startTime: '', endTime: '' }
+    return {
+      categoryName: job.categoryName || job.category || '',
+      location: job.location || '',
+      region: job.region || '',
+      district: job.district || '',
+      dong: job.dong || '',
+      requirements: Array.isArray(job.requirements) ? job.requirements : [],
+      qualifications: Array.isArray(job.qualifications) ? job.qualifications : [],
+      description: job.description || '',
+      gender: job.gender || '',
+      age: job.age || job.preferredAge || '',
+      startTime: job.startTime || job.start_time || '',
+      endTime: job.endTime || job.end_time || ''
+    }
+  }
+
+  // 적합도 계산: 선택된 공고와 후보자 특성 매칭
+  const computeSuitability = (candidate: any): number => {
+    const job = getSelectedJob()
+    const { categoryName, location, region, district, dong, requirements, qualifications, description, gender, age, startTime, endTime } = getJobFields(job)
+
+    // 후보자 데이터 추출
+    const desiredNames: string[] = Array.isArray(candidate.desiredCategories)
+      ? candidate.desiredCategories.map((v: any) => String(v).trim()).filter(Boolean)
+      : (candidate.desiredCategory ? [String(candidate.desiredCategory)] : [])
+    const desiredNorm = desiredNames.map(normalize)
+    const prefRegion = getPreferredRegion(candidate)
+    const prefDistrict = getPreferredDistrict(candidate)
+    const prefDong = getPreferredDong(candidate)
+    const preferredText = getPreferredLocationText(candidate)
+    const licNames: string[] = Array.isArray(candidate.licenses) ? candidate.licenses.map((l: any) => String(l)) : []
+    const licNorm = licNames.map(normalize)
+    const expTexts: string[] = Array.isArray(candidate.experience) ? candidate.experience.map((e: any) => String(e)) : []
+    const candGender = normalizeGender((candidate as any).gender || (candidate as any)?.profile?.gender || (candidate as any)?.jobseekerProfile?.gender)
+    const candAge: number | undefined = Number.isFinite(candidate.age) ? Number(candidate.age) : undefined
+    const candWorkTime: string = (candidate as any)?.workTime || (candidate as any)?.preferredWorkTime || (candidate as any)?.jobseekerProfile?.workTime || ''
+    const candIntro: string = (candidate as any)?.introduction || (candidate as any)?.intro || (candidate as any)?.profile?.introduction || (candidate as any)?.jobseekerProfile?.introduction || ''
+    const candStrengthsArr: string[] = Array.isArray((candidate as any)?.strengths)
+      ? ((candidate as any)?.strengths as any[]).map((s: any) => String(s).trim()).filter(Boolean)
+      : String((candidate as any)?.profile?.strengths || (candidate as any)?.jobseekerProfile?.strengths || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+
+    // 기준점
+    let score = job ? 40 : 50
+    let cap = 100
+
+    // 1) 업직종 카테고리 매칭 (최대 +40)
+    if (job) {
+      const jobCatNorm = normalize(categoryName)
+      if (jobCatNorm) {
+        if (desiredNorm.some(d => d && (d === jobCatNorm || jobCatNorm.includes(d) || d.includes(jobCatNorm)))) {
+          score += 8
+        } else if (desiredNorm.some(d => d && (d.slice(0, 4) === jobCatNorm.slice(0, 4)))) {
+          score += 5
+        } else {
+          score += 2 // 약한 관련
+        }
+      }
+    }
+
+    // 2) 지역 매칭 (최대 +20) + 불일치 페널티
+    if (job) {
+      const regionHit = prefRegion && region && prefRegion === region
+      const districtHit = prefDistrict && district && prefDistrict === district
+      const dongHit = prefDong && dong && prefDong === dong && prefDong !== '전체'
+      if (regionHit) score += 10
+      if (districtHit) score += 6
+      if (dongHit) score += 4
+      // location 문자열 포함 매칭 보조
+      const locNorm = normalize(location)
+      const prefNorm = normalize(preferredText)
+      const locHit = !!(locNorm && prefNorm && (locNorm.includes(prefNorm) || prefNorm.includes(locNorm)))
+      if (locHit) {
+        score += 6
+      }
+      // 불일치 페널티(희망 위치가 명시되어 있고, 공고 위치도 명시되었는데 매칭이 전혀 없을 때 감점)
+      const hasPref = !!(prefRegion || prefDistrict || (prefDong && prefDong !== '전체'))
+      const hasJobLoc = !!(region || district || dong || location)
+      if (hasJobLoc && hasPref) {
+        if (!regionHit && region && prefRegion) score -= 30
+        if (!districtHit && district && prefDistrict) score -= 20
+        if (!dongHit && dong && prefDong && prefDong !== '전체') score -= 10
+        if (!(regionHit || districtHit || dongHit || locHit)) score -= 8
+        // 위치 불일치 시 상한선 적용(지역 40, 구/군 55, 동 65)
+        if (!regionHit && region && prefRegion) cap = Math.min(cap, 40)
+        else if (!districtHit && district && prefDistrict) cap = Math.min(cap, 55)
+        else if (!dongHit && dong && prefDong && prefDong !== '전체') cap = Math.min(cap, 65)
+        // 지역(시/도) 자체가 다르거나 위치 매칭이 전혀 없으면 절대 상한 10%
+        const regionMismatch = !!(region && prefRegion && !regionHit)
+        const noAnyMatch = !(regionHit || districtHit || dongHit || locHit)
+        if (regionMismatch || noAnyMatch) cap = Math.min(cap, 10)
+      }
+    }
+
+    // 3) 보유 자격/요구조건 매칭 (최대 +20)
+    const jobNeeds = [...requirements, ...qualifications].map(normalize).filter(Boolean)
+    if (jobNeeds.length > 0 && licNorm.length > 0) {
+      const overlap = licNorm.filter(l => jobNeeds.some(jn => jn && (l.includes(jn) || jn.includes(l)))).length
+      score += Math.min(10, overlap * 5)
+    }
+
+    // 4) 경력/설명 키워드 매칭 (최대 +10)
+    const descNorm = normalize(description)
+    if (descNorm) {
+      if (desiredNorm.some(d => d && descNorm.includes(d))) score += 6
+      if (expTexts.some(t => normalize(t) && descNorm.includes(normalize(t)))) score += 4
+    }
+
+    // 5) 최근 업데이트 보정 (최대 +5)
+    const updated = getUpdatedRaw(candidate)
+    const updatedDate = toDate(updated)
+    if (updatedDate) {
+      const diffDays = Math.floor((Date.now() - updatedDate.getTime()) / (1000 * 60 * 60 * 24))
+      if (diffDays <= 7) score += 5
+      else if (diffDays <= 30) score += 2
+    }
+    // 6) 성별/나이 매칭 보정 (최대 +14)
+    if (job) {
+      const jobGender = normalizeGender(gender)
+      // 공고 성별이 무관('')이면 후보 성별만 있으면 일치로 간주
+      if (candGender && (jobGender === '' || jobGender === candGender)) score += 3
+      const jobAgeRange = parseJobAgeRange(age)
+      // 공고 나이가 무관(null)이면 후보 나이만 있으면 일치로 간주
+      if ((jobAgeRange == null && Number.isFinite(candAge as any)) || isAgeInRange(candAge, jobAgeRange)) score += 4
+    }
+
+    // 7) 근무시간 매칭 (최대 +8)
+    const parseHHMM = (s: string): number | null => {
+      const m = String(s || '').match(/^(\d{2}):(\d{2})$/)
+      if (!m) return null
+      const h = parseInt(m[1], 10), mi = parseInt(m[2], 10)
+      if (isNaN(h) || isNaN(mi)) return null
+      return h * 60 + mi
+    }
+    const parseCandidateTime = (s: string): { start: number; end: number } | null => {
+      const mm = String(s || '').match(/(\d{2}:\d{2})\s*~\s*(\d{2}:\d{2})/)
+      if (mm) {
+        const a = parseHHMM(mm[1]); const b = parseHHMM(mm[2])
+        if (a != null && b != null) return { start: a, end: b }
+      }
+      // '풀타임' 또는 '무관'은 항상 매칭으로 간주
+      if (/풀타임|무관/.test(String(s || ''))) return { start: 0, end: 24 * 60 }
+      return null
+    }
+    const jobStart = parseHHMM(String(startTime || '')); const jobEnd = parseHHMM(String(endTime || ''))
+    const candRange = parseCandidateTime(candWorkTime)
+    if (jobStart != null && jobEnd != null && candRange) {
+      const overlap = Math.max(0, Math.min(jobEnd, candRange.end) - Math.max(jobStart, candRange.start))
+      if (overlap >= 240) score += 8
+      else if (overlap >= 60) score += 4
+    }
+
+    // 8) 자기소개 ↔ 직무설명 키워드 매칭 (최대 +8)
+    if (candIntro && description) {
+      const introTokens = String(candIntro).toLowerCase().split(/[^a-zA-Z0-9가-힣]+/).filter(t => t.length >= 2)
+      const descLow = String(description).toLowerCase()
+      let hits = 0
+      const seen = new Set<string>()
+      for (const t of introTokens) {
+        if (seen.has(t)) continue
+        seen.add(t)
+        if (descLow.includes(t)) hits++
+        if (hits >= 4) break
+      }
+      if (hits >= 3) score += 8
+      else if (hits >= 1) score += 4
+    }
+    // 9) 나의 강점 ↔ 직무설명 매칭 (최대 +6)
+    if (candStrengthsArr.length > 0 && description) {
+      const descLow = String(description).toLowerCase()
+      const strengthsLow = candStrengthsArr.map(s => s.toLowerCase())
+      const matched = strengthsLow.filter(s => s && descLow.includes(s)).length
+      if (matched >= 2) score += 6
+      else if (matched >= 1) score += 3
+    }
+
+    // 범위 보정 + 위치 상한 적용
+    if (!Number.isFinite(score)) score = 50
+    score = Math.min(score, cap)
+    score = Math.max(0, Math.min(100, Math.round(score)))
+    return score
+  }
+
+  // 공고 마감 여부(백엔드 키 다양성 대응)
+  const isJobClosed = (status?: string, deadline?: string): boolean => {
+    const s = String(status || '').trim().toUpperCase()
+    if (s === 'CLOSED' || s.includes('마감') || s.includes('종료')) return true
+    if (!deadline) return false
+    const d = new Date(deadline)
+    if (isNaN(d.getTime())) return false
+    const today = new Date()
+    d.setHours(0, 0, 0, 0)
+    today.setHours(0, 0, 0, 0)
+    return d.getTime() < today.getTime()
+  }
+
+  // 수정일 표시 헬퍼: updatedAt | updated_at | lastModified | modifiedAt 중 첫 번째 사용
+  const pickFirstAny = (obj: any, paths: string[][]): any => {
+    for (const p of paths) {
+      let cur = obj
+      for (const key of p) {
+        if (cur == null) { cur = undefined; break }
+        cur = cur[key]
+      }
+      if (cur != null && cur !== '') return cur
+    }
+    return undefined
+  }
+  const getUpdatedRaw = (c: any): any => {
+    // 프로필 저장 시간을 최우선으로 사용
+    const profilePreferred = pickFirstAny(c, [
+      ['jobseekerProfile', 'updatedAt'], ['jobseekerProfile', 'updated_at'], ['jobseekerProfile', 'lastModified'], ['jobseekerProfile', 'modifiedAt'],
+      ['profile', 'updatedAt'], ['profile', 'updated_at'], ['profile', 'lastModified'], ['profile', 'modifiedAt'],
+      ['user', 'profileUpdatedAt'], ['user', 'profile_updated_at'], ['user', 'profileLastModified'], ['user', 'profile_modified_at'],
+      ['profileUpdatedAt'], ['profile_updated_at'], ['profileLastModified'], ['profile_modified_at'],
+    ])
+    if (profilePreferred != null && profilePreferred !== '') return profilePreferred
+    // 폴백: 상위 엔티티의 일반 수정일
+    return c?.updatedAt ?? c?.updated_at ?? c?.lastModified ?? c?.modifiedAt
+  }
+
+  const toDate = (value: any): Date | null => {
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value
+    if (typeof value === 'number') {
+      // seconds vs milliseconds
+      const ms = value < 1e12 ? value * 1000 : value
+      const d = new Date(ms)
+      return isNaN(d.getTime()) ? null : d
+    }
+    if (typeof value === 'string') {
+      const s = value.trim()
+      if (!s) return null
+      // numeric string (epoch seconds/ms)
+      if (/^\d{10,13}$/.test(s)) {
+        const num = parseInt(s, 10)
+        return toDate(num)
+      }
+      // "YYYY-MM-DD HH:mm:ss" → ISO
+      if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) {
+        const d = new Date(s.replace(' ', 'T'))
+        return isNaN(d.getTime()) ? null : d
+      }
+      // "YYYY/MM/DD HH:mm:ss" → ISO
+      if (/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) {
+        const d = new Date(s.replace(/\//g, '-').replace(' ', 'T'))
+        return isNaN(d.getTime()) ? null : d
+      }
+      // Fallback to Date parsing (handles ISO and RFC)
+      const d = new Date(s)
+      return isNaN(d.getTime()) ? null : d
+    }
+    return null
+  }
+
+  const formatRelativeTime = (value: any): string => {
+    const date = toDate(value)
+    if (!date || isNaN(date.getTime())) return '-'
+    const now = new Date().getTime()
+    const diffMs = now - date.getTime()
+    if (diffMs < 0) return '방금 전'
+    const sec = Math.floor(diffMs / 1000)
+    if (sec < 60) return '방금 전'
+    const min = Math.floor(sec / 60)
+    if (min < 60) return `${min}분 전`
+    const hour = Math.floor(min / 60)
+    if (hour < 24) return `${hour}시간 전`
+    const day = Math.floor(hour / 24)
+    return `${day}일 전`
+  }
+
+  const getUpdatedLabel = (c: any): string => {
+    // 우선: 프로필 저장 시간
+    let raw = getUpdatedRaw(c)
+    // 추가 후보 키들도 탐색(백엔드 필드 다양성 대응)
+    if (raw == null || raw === '') {
+      raw = pickFirstAny(c, [
+        ['updatedDate'], ['updateDate'], ['modifiedDate'], ['lastModifiedDate'], ['lastUpdated'], ['lastUpdatedAt'],
+        ['jobseeker', 'updatedAt'], ['jobseeker', 'updated_at'], ['jobseeker', 'updatedDate'], ['jobseeker', 'lastModifiedDate'],
+        ['jobseekerProfile', 'updatedDate'], ['jobseekerProfile', 'lastModifiedDate'],
+        ['profile', 'updatedDate'], ['profile', 'lastModifiedDate'],
+      ])
+    }
+    if (raw == null || raw === '') return '-'
+    return formatRelativeTime(raw)
+  }
+
   // 희망 근무지역 헬퍼 (DB 스키마/케이스/중첩 객체 다양성 고려)
   const pickFirst = (obj: any, paths: string[][]): string => {
     for (const p of paths) {
@@ -406,7 +758,20 @@ function CandidateSearch() {
       .replace(/(특별자치도|특별자치시|광역시|특별시|자치구|시|군|구|도|동|읍|면)/g, '')
   }
 
-  const filteredCandidates = candidates.filter(candidate => {
+  // 수정일(최근 저장 시각) 기준 내림차순 정렬
+  const sortedCandidates = [...candidates].sort((a, b) => {
+    const ta = (() => {
+      const d = toDate(getUpdatedRaw(a))
+      return d ? d.getTime() : 0
+    })()
+    const tb = (() => {
+      const d = toDate(getUpdatedRaw(b))
+      return d ? d.getTime() : 0
+    })()
+    return tb - ta
+  })
+
+  const filteredCandidates = sortedCandidates.filter(candidate => {
     const searchRaw = searchQuery.trim();
     const searchLower = searchRaw.toLowerCase();
     const searchKo = normalizeKo(searchRaw);
@@ -451,7 +816,9 @@ function CandidateSearch() {
       return np.includes(nf) || nf.includes(np);
     })();
     const matchesLicense = licenseFilter === '전체' || candidate.licenses?.some((license: string) => license.includes(licenseFilter))
-    const matchesSuitability = candidate.suitability >= minSuitability
+    // 적합도: 선택 공고와의 매칭 기반으로 계산
+    const suitabilityScore = computeSuitability(candidate)
+    const matchesSuitability = suitabilityScore >= minSuitability
     return matchesSearch && matchesLocation && matchesLicense && matchesSuitability;
   })
 
@@ -885,7 +1252,8 @@ function CandidateSearch() {
           </div>
           {/* Rows */}
           {filteredCandidates.map((candidate) => {
-            const updatedAgo = candidate.updatedAt ? candidate.updatedAt : '최근'
+            const updatedAgo = getUpdatedLabel(candidate)
+            const suitabilityScore = computeSuitability(candidate)
             return (
               <div
                 key={candidate.id}
@@ -926,7 +1294,7 @@ function CandidateSearch() {
                           borderRadius: 12,
                           fontSize: 12,
                           fontWeight: 600
-                        }}>이미 제안함</span>
+                        }}>제안함</span>
                         )
                       })()}
                       {selectedJobId && declinedPairs.includes(makePair(selectedJobId, candidate.id)) && (
@@ -944,20 +1312,27 @@ function CandidateSearch() {
                       적합도 <span style={{
                         padding: '2px 6px',
                         backgroundColor: '#e3f2fd',
-                        color: '#2196f3',
+                        color: getSuitabilityColor(suitabilityScore),
                         borderRadius: 10,
                         fontWeight: 700
-                      }}>{candidate.suitability}%</span>
+                      }}>{suitabilityScore}%</span>
                     </div>
                   </div>
                 </div>
                 {/* 프로필 요약 + 업종별 카테고리 */}
                 <div
                   onClick={() => navigate(`/employer/candidates/${candidate.id}`)}
-                  style={{ fontSize: 14, color: '#555', overflow: 'hidden', cursor: 'pointer' }}
+                  style={{ fontSize: 14, color: '#555', overflow: 'hidden', cursor: 'pointer', marginLeft: -30 }}
                 >
-                  <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                    {candidate.summary || candidate.experience?.[0] || '요약 정보가 없습니다.'}
+                  <div style={{ whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', fontWeight: 600 }}>
+                    {(() => {
+                      const intro =
+                        candidate.introduction ||
+                        candidate.profile?.introduction ||
+                        candidate.jobseekerProfile?.introduction ||
+                        ''
+                      return intro || candidate.summary || '요약 정보가 없습니다.'
+                    })()}
                   </div>
                   {(() => {
                     const desiredRaw = Array.isArray(candidate.desiredCategories)
@@ -976,12 +1351,12 @@ function CandidateSearch() {
                   })()}
                 </div>
                 {/* 희망지역 */}
-                <div style={{ fontSize: 14, color: '#555' }}>
-                  <MapPin size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                <div style={{ fontSize: 14, color: '#555', marginLeft: -20 }}>
+                  <MapPin size={14} style={{ verticalAlign: 'middle', marginRight: 8 }} />
                   {getPreferredLocationText(candidate)}
                 </div>
                 {/* 수정일 */}
-                <div style={{ fontSize: 13, color: '#999' }}>{updatedAgo}</div>
+                <div style={{ fontSize: 13, color: '#999'}}>{updatedAgo}</div>
                 {/* 액션 */}
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
                   {(() => {
@@ -1063,6 +1438,14 @@ function CandidateSearch() {
                       }
                       if (!selectedJobId) {
                         alert('먼저 상단에서 제안 보낼 공고를 선택하세요.');
+                        return;
+                      }
+                      // 선택된 공고가 마감이면 차단
+                      const selectedJob = jobs.find(j => String(j.id) === String(selectedJobId))
+                      const sjStatus = selectedJob?.status || selectedJob?.jobStatus || selectedJob?.postingStatus
+                      const sjDeadline = selectedJob?.deadline || selectedJob?.jobDeadline || selectedJob?.job_deadline
+                      if (isJobClosed(sjStatus, sjDeadline)) {
+                        alert('마감된 공고에는 제안할 수 없습니다. 다른 공고를 선택해 주세요.')
                         return;
                       }
                       if (selectedJobId && proposedPairs.includes(makePair(selectedJobId, candidate.id)) && !declinedPairs.includes(makePair(selectedJobId, candidate.id))) {
