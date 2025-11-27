@@ -371,7 +371,10 @@ function JobPosting() {
       const startM = (() => { const [h,m] = (formData.startTime||'00:00').split(':').map(Number); return h*60+(m||0) })()
       const endM = (() => { const [h,m] = (formData.endTime||'00:00').split(':').map(Number); return h*60+(m||0) })()
       const diffMin = Math.max(0, endM - startM)
-      const workHoursStr = `${formData.startTime}~${formData.endTime}`
+      const toHHMMSS = (t: string) => (t && t.length === 5) ? `${t}:00` : (t || '00:00:00')
+      const startTimeSec = toHHMMSS(formData.startTime)
+      const endTimeSec = toHHMMSS(formData.endTime)
+      const workHoursStr = `${startTimeSec}~${endTimeSec}`
       const jobTypeDerived = diffMin >= 480 ? '풀타임' : '파트타임'
       const postedDateIso = new Date().toISOString()
 
@@ -408,18 +411,19 @@ function JobPosting() {
         district: selectedDistrict.slice(0, MAX_VARCHAR),
         dong: (selectedDong || '').slice(0, MAX_VARCHAR),
         description: formData.description.slice(0, MAX_VARCHAR),
-        // 배열 -> 쉼표 문자열 변환
+        // 배열 전송(백엔드가 ArrayList를 기대)
         qualifications: formData.qualifications
           .filter(q => q.trim() !== '')
-          .map(q => q.slice(0, 60))
-          .join(','),
-        requirements: formData.requirements.join(',').slice(0, MAX_VARCHAR),
+          .map(q => q.slice(0, 60)),
+        requirements: formData.requirements,
         otherRequirement: formData.otherRequirement.slice(0, MAX_VARCHAR),
         // 백엔드 컬럼명과 매핑: work_days / work_hours 로 매핑될 수 있도록 키 이름 맞춤
         workDays: workDaysJoined,
+        work_days: workDaysJoined, // alias for backend snake_case
         workHours: workHoursStr,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
+        work_hours: workHoursStr, // alias for backend snake_case
+        startTime: startTimeSec,
+        endTime: endTimeSec,
         salary: formData.salary.slice(0, MAX_VARCHAR),
         salaryType: formData.salaryType.slice(0, MAX_VARCHAR),
         deadline: formData.deadline || null,
@@ -428,8 +432,14 @@ function JobPosting() {
         education: formData.education.slice(0, MAX_VARCHAR),
         // 기본 상태/타입/날짜
         status: 'OPEN',
+        e_status: 'OPEN', // alias for backend snake_case naming
         jobType: jobTypeDerived,
+        job_type: jobTypeDerived, // alias
         postedDate: postedDateIso,
+        posted_date: postedDateIso, // alias
+        created_at: postedDateIso,
+        updated_at: postedDateIso,
+        employer_id: Number(employerId),
         // 관측용 초기값
         views: 0,
       }
@@ -449,7 +459,17 @@ function JobPosting() {
         alert('일자리 공고가 등록되었습니다!')
         navigate('/employer/jobs')
       } else {
-        alert(data.message || '공고 등록에 실패했습니다.')
+        console.warn('[job posting] payload=', payload)
+        try {
+          alert(data.message || data.error || `공고 등록에 실패했습니다. (HTTP ${response.status})`)
+        } catch {
+          try {
+            const text = await response.text()
+            alert(text || `공고 등록에 실패했습니다. (HTTP ${response.status})`)
+          } catch {
+            alert(`공고 등록에 실패했습니다. (HTTP ${response.status})`)
+          }
+        }
       }
     } catch (error) {
       console.error('공고 등록 에러:', error)
