@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Briefcase, ArrowLeft } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { apiCall, getErrorMessage } from '../utils/api'
+import { apiCall, getErrorMessage, createApiUrl } from '../utils/api'
 
 function EmployerLogin() {
   const navigate = useNavigate()
@@ -15,23 +15,29 @@ function EmployerLogin() {
     e.preventDefault()
     setIsSubmitting(true)
     try {
-      const response = await apiCall<{
+      // 로그인은 401 처리가 특수하므로 apiCall 대신 직접 fetch 사용
+      const res = await fetch(createApiUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+      if (!res.ok) {
+        if (res.status === 400 || res.status === 401) {
+          alert('이메일주소/비밀번호가 잘못되었습니다.\n다시 시도하거나 회원이 아닐경우 회원가입 창으로 이동하시길 바랍니다.')
+          return
+        }
+        const data = await res.json().catch(() => ({}))
+        alert(data.message || `로그인 실패 (HTTP ${res.status})`)
+        return
+      }
+      const response = await res.json() as {
         userId: number
         email: string
         userType: string
         message: string
         accessToken: string
         refreshToken: string
-      }>('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: email,
-          password: password
-        })
-      })
+      }
 
       // userType 확인
       if (response.userType !== 'EMPLOYER') {

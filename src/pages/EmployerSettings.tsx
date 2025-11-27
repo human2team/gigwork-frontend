@@ -33,7 +33,7 @@ function EmployerSettings() {
   }
 
   // 비밀번호 변경 제출
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     // 유효성 검사
@@ -56,17 +56,30 @@ function EmployerSettings() {
       alert('현재 비밀번호와 새 비밀번호가 동일합니다.')
       return
     }
-    
-    // 비밀번호 변경 로직 (실제로는 API 호출)
-    console.log('비밀번호 변경:', passwordData)
-    alert('비밀번호가 성공적으로 변경되었습니다.')
-    
-    // 폼 초기화
-    setPasswordData({
-      currentPassword: '',
-      newPassword: '',
-      confirmPassword: ''
-    })
+    try {
+      const userId = localStorage.getItem('userId')
+      if (!userId) {
+        alert('로그인이 필요합니다.')
+        return
+      }
+      const res = await fetch(`/api/auth/change-password/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword
+        })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        alert(data.message || '비밀번호가 성공적으로 변경되었습니다.')
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      } else {
+        alert(data.message || '비밀번호 변경에 실패했습니다.')
+      }
+    } catch (err) {
+      alert('비밀번호 변경 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.')
+    }
   }
 
   // 탈퇴 모달 열기
@@ -82,7 +95,7 @@ function EmployerSettings() {
   }
 
   // 탈퇴 처리
-  const handleWithdrawal = (e: React.FormEvent) => {
+  const handleWithdrawal = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!withdrawalPassword) {
@@ -94,14 +107,28 @@ function EmployerSettings() {
       alert('탈퇴 확인을 위해 체크박스를 선택해주세요.')
       return
     }
-    
-    // 탈퇴 로직 (실제로는 API 호출)
-    console.log('계정 탈퇴:', { password: withdrawalPassword })
-    alert('계정이 탈퇴되었습니다.')
-    
-    // 로그아웃 및 홈으로 이동
-    logout()
-    navigate('/')
+    try {
+      const userId = localStorage.getItem('userId')
+      if (!userId) {
+        alert('로그인이 필요합니다.')
+        return
+      }
+      const res = await fetch(`/api/auth/account/${userId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: withdrawalPassword })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        alert(data.message || '계정이 탈퇴되었습니다.')
+        logout()
+        navigate('/')
+      } else {
+        alert(data.message || '계정 탈퇴에 실패했습니다.')
+      }
+    } catch (err) {
+      alert('계정 탈퇴 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.')
+    }
   }
 
   return (
