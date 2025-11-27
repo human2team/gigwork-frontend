@@ -631,35 +631,68 @@ function Chatbot() {
               원하시는 조건을 자유롭게 말씀해주세요
             </p>
           </div>
-          <button
-            onClick={clearHistory}
-            style={{
-              padding: '8px 16px',
-              border: '1px solid #e0e0e0',
-              borderRadius: '8px',
-              backgroundColor: '#ffffff',
-              color: '#666',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '14px',
-              transition: 'all 0.2s'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#f5f5f5'
-              e.currentTarget.style.borderColor = '#ff5252'
-              e.currentTarget.style.color = '#ff5252'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = '#ffffff'
-              e.currentTarget.style.borderColor = '#e0e0e0'
-              e.currentTarget.style.color = '#666'
-            }}
-          >
-            <Trash2 size={16} />
-            대화 내역 삭제
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button
+              onClick={() => {
+                const userEmail = localStorage.getItem('userEmail') || 'oldclock@sbs.co.kr'
+                window.open(`http://localhost:3000?email=${encodeURIComponent(userEmail)}`, '_blank')
+              }}
+              style={{
+                padding: '8px 16px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                backgroundColor: '#ffffff',
+                color: '#666',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f5f5f5'
+                e.currentTarget.style.borderColor = '#2196f3'
+                e.currentTarget.style.color = '#2196f3'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#ffffff'
+                e.currentTarget.style.borderColor = '#e0e0e0'
+                e.currentTarget.style.color = '#666'
+              }}
+            >
+              MCP 테스트
+            </button>
+            <button
+              onClick={clearHistory}
+              style={{
+                padding: '8px 16px',
+                border: '1px solid #e0e0e0',
+                borderRadius: '8px',
+                backgroundColor: '#ffffff',
+                color: '#666',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f5f5f5'
+                e.currentTarget.style.borderColor = '#ff5252'
+                e.currentTarget.style.color = '#ff5252'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = '#ffffff'
+                e.currentTarget.style.borderColor = '#e0e0e0'
+                e.currentTarget.style.color = '#666'
+              }}
+            >
+              <Trash2 size={16} />
+              대화 내역 삭제
+            </button>
+          </div>
         </div>
 
         {/* 채팅 영역 */}
