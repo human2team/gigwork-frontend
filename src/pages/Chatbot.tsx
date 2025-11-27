@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Send, Bot, User, Trash2, MapPin, DollarSign, ArrowRight, Bookmark, BookmarkCheck } from 'lucide-react'
 import JobPreferencesCard from '../components/JobPreferencesCard'
 import axios from 'axios'
+import { createApiUrl, getApiBaseUrl } from '../utils/api'
 interface Message {
   id: number
   text: string
@@ -38,6 +39,9 @@ interface UserJobPreferences {
   hourly_wage: number | null
   requirements: string | null
   category: string | null
+  categories?: string | null
+  job_text?: string | null
+  person_text?: string | null
 }
 
 function Chatbot() {
@@ -79,7 +83,10 @@ function Chatbot() {
     end_time: null,
     hourly_wage: null,
     requirements: null,
-    category: null
+    category: null,
+    categories: null,
+    job_text: null,
+    person_text: null
   });
 
   // userPreferences 변경 시 콘솔 출력 (디버깅용)
@@ -90,6 +97,10 @@ function Chatbot() {
   const [isSearching, setIsSearching] = useState(false)
   const [savedJobIds, setSavedJobIds] = useState<number[]>([])
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const getChatUrl = () => {
+    const base = getApiBaseUrl().replace(/\/$/, '')
+    return `${base}/chat`
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -229,7 +240,9 @@ function Chatbot() {
     preferences?: Partial<UserJobPreferences> 
   }> => {
     try {
-      const res = await axios.post('http://localhost:8080/chat', {
+      // chat endpoint는 프록시 우회하고 환경 변수 기반 base URL을 직접 사용
+      const chatUrl = getChatUrl()
+      const res = await axios.post(chatUrl, {
         text: userInput,
         condition: userPref,
         search: false
@@ -301,7 +314,9 @@ function Chatbot() {
   const handleSearch = async () => {
     setIsSearching(true)
     try {
-      const res = await axios.post('http://localhost:8080/chat', {
+      // chat endpoint는 프록시 우회하고 환경 변수 기반 base URL을 직접 사용
+      const chatUrl = getChatUrl()
+      const res = await axios.post(chatUrl, {
         text: inputText,
         condition: userPreferences, 
         search: true
@@ -409,10 +424,13 @@ function Chatbot() {
     if (Object.keys(extractedPreferences).length > 0) {
       let confirmText = '입력하신 조건을 확인했습니다:\n\n'
       if (extractedPreferences.place) confirmText += `📍 지역: ${formatConditionValue(extractedPreferences.place, 'place')}\n`
-      if (extractedPreferences.category) confirmText += `💼 직종: ${formatConditionValue(extractedPreferences.category, 'category')}\n`
+      const categoryValue = extractedPreferences.categories ?? extractedPreferences.category
+      if (categoryValue) confirmText += `💼 직종: ${formatConditionValue(categoryValue, 'category')}\n`
       if (extractedPreferences.work_days) confirmText += `📅 근무일: ${formatConditionValue(extractedPreferences.work_days, 'work_days')}\n`
       if (extractedPreferences.hourly_wage) confirmText += `💰 시급: ${Number(extractedPreferences.hourly_wage).toLocaleString()}원\n`
       if (extractedPreferences.start_time) confirmText += `⏰ 시간: ${formatConditionValue(extractedPreferences.start_time, 'start_time')} ~ ${formatConditionValue(extractedPreferences.end_time, 'end_time')}\n`
+      if (extractedPreferences.job_text) confirmText += `📝 하고 싶은 일: ${formatConditionValue(extractedPreferences.job_text, 'job_text')}\n`
+      if (extractedPreferences.person_text) confirmText += `👤 내 정보: ${formatConditionValue(extractedPreferences.person_text, 'person_text')}\n`
       
       confirmText += '\n추가 조건이 있으시면 말씀해주세요. 없으시면 아래 검색 버튼을 눌러주세요!'
 
@@ -569,7 +587,10 @@ function Chatbot() {
       end_time: null,
       hourly_wage: null,
       requirements: null,
-      category: null
+      category: null,
+      categories: null,
+      job_text: null,
+      person_text: null
     })
     setSearchResults([])
   }
