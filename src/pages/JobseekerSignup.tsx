@@ -40,6 +40,19 @@ function JobseekerSignup() {
     }
   }, [])
 
+  // 브라우저 자동완성으로 이전 로그인 값이 채워지는 문제 방지
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFormData(prev => ({
+        ...prev,
+        email: '',
+        password: '',
+        confirmPassword: ''
+      }))
+    }, 100)
+    return () => clearTimeout(t)
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -162,7 +175,7 @@ function JobseekerSignup() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
               이름 <span style={{ color: '#f44336' }}>*</span>
@@ -174,6 +187,7 @@ function JobseekerSignup() {
               onChange={handleChange}
               placeholder="이름을 입력하세요"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -195,6 +209,7 @@ function JobseekerSignup() {
               onChange={handleChange}
               placeholder="email@example.com"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -216,6 +231,7 @@ function JobseekerSignup() {
               onChange={handleChange}
               placeholder="010-1234-5678"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -236,6 +252,7 @@ function JobseekerSignup() {
               value={formData.birthDate}
               onChange={handleChange}
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -252,13 +269,14 @@ function JobseekerSignup() {
             </label>
             <div style={{ position: 'relative' }}>
               <input
-                type={showPassword ? 'text' : 'password'}
+              type={showPassword ? 'text' : 'password'}
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
                 placeholder="8자 이상 입력하세요"
                 required
                 minLength={8}
+              autoComplete="new-password"
                 style={{
                   width: '100%',
                   padding: '12px 40px 12px 12px',
@@ -298,6 +316,7 @@ function JobseekerSignup() {
                 onChange={handleChange}
                 placeholder="비밀번호를 다시 입력하세요"
                 required
+                autoComplete="new-password"
                 style={{
                   width: '100%',
                   padding: '12px 40px 12px 12px',

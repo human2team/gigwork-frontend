@@ -1308,15 +1308,17 @@ function CandidateSearch() {
                         }}>거절됨</span>
                       )}
                     </div>
-                    <div style={{ fontSize: 12, color: '#999' }}>
-                      적합도 <span style={{
-                        padding: '2px 6px',
-                        backgroundColor: '#e3f2fd',
-                        color: getSuitabilityColor(suitabilityScore),
-                        borderRadius: 10,
-                        fontWeight: 700
-                      }}>{suitabilityScore}%</span>
-                    </div>
+                    {getSelectedJob() && (
+                      <div style={{ fontSize: 12, color: '#999' }}>
+                        적합도 <span style={{
+                          padding: '2px 6px',
+                          backgroundColor: '#e3f2fd',
+                          color: getSuitabilityColor(suitabilityScore),
+                          borderRadius: 10,
+                          fontWeight: 700
+                        }}>{suitabilityScore}%</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 {/* 프로필 요약 + 업종별 카테고리 */}

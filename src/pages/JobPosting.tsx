@@ -4,6 +4,10 @@ import { useNavigate } from 'react-router-dom';
 
 function JobPosting() {
   const navigate = useNavigate()
+  // 백엔드 컬럼 제한(varchar(255))에 맞춰 프런트에서도 길이 제한
+  const MAX_VARCHAR = 255
+  // work_days 컬럼은 운영 DB에서 더 짧을 수 있어 보수적으로 200자로 제한
+  const MAX_WORKDAYS_LEN = 200
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -133,9 +137,16 @@ function JobPosting() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target
+    // 텍스트 필드는 255자 제한 적용
+    const capped = (() => {
+      if (['title', 'category', 'company', 'location', 'description', 'otherRequirement', 'salary', 'salaryType', 'gender', 'age', 'education'].includes(name)) {
+        return String(value).slice(0, MAX_VARCHAR)
+      }
+      return value
+    })()
     setFormData({
       ...formData,
-      [name]: value
+      [name]: capped
     })
   }
 
@@ -311,6 +322,24 @@ function JobPosting() {
       alert('모든 필수 항목을 입력해주세요.')
       return
     }
+    // 길이 검증(백엔드 varchar(255) 초과 방지)
+    const over = (label: string, v: any) => String(v ?? '').length > MAX_VARCHAR
+    const payloadCategoryName = (selectedJobSub?.nm === '전체'
+      ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || formData.category)
+      : (selectedJobSub?.nm || formData.category))
+    const lengthErrors: string[] = []
+    if (over('직무 제목', formData.title)) lengthErrors.push('직무 제목')
+    if (over('직업 카테고리', payloadCategoryName)) lengthErrors.push('직업 카테고리')
+    if (over('회사명', formData.company)) lengthErrors.push('회사명')
+    if (over('위치', formData.location)) lengthErrors.push('위치')
+    if (over('직무 설명', formData.description)) lengthErrors.push('직무 설명')
+    if (over('기타 요구사항', formData.otherRequirement)) lengthErrors.push('기타 요구사항')
+    if (over('급여', formData.salary)) lengthErrors.push('급여')
+    if (over('급여 유형', formData.salaryType)) lengthErrors.push('급여 유형')
+    if (lengthErrors.length > 0) {
+      alert(`다음 항목의 길이가 너무 깁니다(최대 ${MAX_VARCHAR}자):\n- ${lengthErrors.join('\n- ')}`)
+      return
+    }
     
     // 근무 날짜 검증
     if (formData.workingDays.length === 0) {
@@ -338,40 +367,80 @@ function JobPosting() {
         return
       }
 
+      // 파생 필드 만들기
+      const startM = (() => { const [h,m] = (formData.startTime||'00:00').split(':').map(Number); return h*60+(m||0) })()
+      const endM = (() => { const [h,m] = (formData.endTime||'00:00').split(':').map(Number); return h*60+(m||0) })()
+      const diffMin = Math.max(0, endM - startM)
+      const workHoursStr = `${formData.startTime}~${formData.endTime}`
+      const jobTypeDerived = diffMin >= 480 ? '풀타임' : '파트타임'
+      const postedDateIso = new Date().toISOString()
+
+      // workDays 200자 제한 안전 처리(보수적)
+      const buildWorkDaysSafe = (days: string[]): string => {
+        let acc = ''
+        for (let i = 0; i < days.length; i++) {
+          const token = days[i]
+          const next = acc ? acc + ',' + token : token
+          if (next.length > MAX_WORKDAYS_LEN) break
+          acc = next
+        }
+        return acc
+      }
+      const originalWorkDaysJoined = formData.workingDays.join(',')
+      const workDaysJoined = buildWorkDaysSafe(formData.workingDays)
+      if (workDaysJoined.length < originalWorkDaysJoined.length) {
+        alert(`선택한 근무 날짜가 너무 많아 일부 날짜는 저장에서 제외됩니다.\n최대 ${MAX_WORKDAYS_LEN}자 제한으로 전송 가능한 범위만 저장합니다.`)
+      }
+
+      // 전송 페이로드 구성(백엔드 기대 스키마와 맞춤)
+      const payload = {
+        title: formData.title.slice(0, MAX_VARCHAR),
+        category: (selectedJobSub?.nm === '전체'
+          ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || formData.category)
+          : (selectedJobSub?.nm || formData.category)).slice(0, MAX_VARCHAR),
+        categoryCode: (selectedJobSub?.cd || '').slice(0, MAX_VARCHAR),
+        categoryName: (selectedJobSub?.nm === '전체'
+          ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || formData.category)
+          : (selectedJobSub?.nm || formData.category)).slice(0, MAX_VARCHAR),
+        company: formData.company.slice(0, MAX_VARCHAR),
+        location: formData.location.slice(0, MAX_VARCHAR),
+        region: selectedRegion.slice(0, MAX_VARCHAR),
+        district: selectedDistrict.slice(0, MAX_VARCHAR),
+        dong: (selectedDong || '').slice(0, MAX_VARCHAR),
+        description: formData.description.slice(0, MAX_VARCHAR),
+        // 배열 -> 쉼표 문자열 변환
+        qualifications: formData.qualifications
+          .filter(q => q.trim() !== '')
+          .map(q => q.slice(0, 60))
+          .join(','),
+        requirements: formData.requirements.join(',').slice(0, MAX_VARCHAR),
+        otherRequirement: formData.otherRequirement.slice(0, MAX_VARCHAR),
+        // 백엔드 컬럼명과 매핑: work_days / work_hours 로 매핑될 수 있도록 키 이름 맞춤
+        workDays: workDaysJoined,
+        workHours: workHoursStr,
+        startTime: formData.startTime,
+        endTime: formData.endTime,
+        salary: formData.salary.slice(0, MAX_VARCHAR),
+        salaryType: formData.salaryType.slice(0, MAX_VARCHAR),
+        deadline: formData.deadline || null,
+        gender: formData.gender.slice(0, MAX_VARCHAR),
+        age: formData.age.slice(0, MAX_VARCHAR),
+        education: formData.education.slice(0, MAX_VARCHAR),
+        // 기본 상태/타입/날짜
+        status: 'OPEN',
+        jobType: jobTypeDerived,
+        postedDate: postedDateIso,
+        // 관측용 초기값
+        views: 0,
+      }
+
       // 백엔드 API 호출
       const response = await fetch(`/api/employer/jobs/${employerId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          title: formData.title,
-          category: (selectedJobSub?.nm === '전체'
-            ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || formData.category)
-            : (selectedJobSub?.nm || formData.category)),
-          categoryCode: selectedJobSub?.cd || '',
-          categoryName: (selectedJobSub?.nm === '전체'
-            ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || formData.category)
-            : (selectedJobSub?.nm || formData.category)),
-          company: formData.company,
-          location: formData.location,
-          region: selectedRegion,
-          district: selectedDistrict,
-          dong: selectedDong,
-          description: formData.description,
-          qualifications: formData.qualifications.filter(q => q.trim() !== ''),
-          requirements: formData.requirements,
-          otherRequirement: formData.otherRequirement,
-          workingDays: formData.workingDays,
-          startTime: formData.startTime,
-          endTime: formData.endTime,
-          salary: formData.salary,
-          salaryType: formData.salaryType,
-          deadline: formData.deadline || null,
-          gender: formData.gender,
-          age: formData.age,
-          education: formData.education
-        })
+        body: JSON.stringify(payload)
       })
 
       const data = await response.json()
@@ -732,6 +801,7 @@ function JobPosting() {
               placeholder="회사 소개 및 직무에 대한 상세한 설명을 입력하세요"
               required
               rows={6}
+              maxLength={255}
               style={{
                 width: '100%',
                 padding: '12px',
@@ -742,6 +812,9 @@ function JobPosting() {
                 resize: 'vertical'
               }}
             />
+            <div style={{ fontSize: '12px', color: '#999', textAlign: 'right' }}>
+              {formData.description.length} / 255
+            </div>
           </div>
         </section>
 
@@ -1018,6 +1091,7 @@ function JobPosting() {
                 value={formData.otherRequirement}
                 onChange={(e) => setFormData({ ...formData, otherRequirement: e.target.value })}
                 placeholder="기타 준비물이나 능력을 입력하세요"
+              maxLength={255}
                 style={{
                   width: '100%',
                   padding: '12px',
