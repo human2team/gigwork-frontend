@@ -40,6 +40,19 @@ function EmployerSignup() {
     }
   }, [])
 
+  // 브라우저 자동완성으로 이전 로그인 값이 노출되는 것 방지
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFormData(prev => ({
+        ...prev,
+        email: '',
+        password: '',
+        confirmPassword: ''
+      }))
+    }, 100)
+    return () => clearTimeout(t)
+  }, [])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -156,7 +169,7 @@ function EmployerSignup() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} autoComplete="off">
           <div style={{ marginBottom: '20px' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
               <Building2 size={16} color="#666" />
@@ -169,6 +182,7 @@ function EmployerSignup() {
               onChange={handleChange}
               placeholder="회사명을 입력하세요"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -190,6 +204,7 @@ function EmployerSignup() {
               onChange={handleChange}
               placeholder="000-00-00000"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -211,6 +226,7 @@ function EmployerSignup() {
               onChange={handleChange}
               placeholder="대표자명을 입력하세요"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -232,6 +248,7 @@ function EmployerSignup() {
               onChange={handleChange}
               placeholder="email@example.com"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -253,6 +270,7 @@ function EmployerSignup() {
               onChange={handleChange}
               placeholder="010-1234-5678"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -274,6 +292,7 @@ function EmployerSignup() {
               onChange={handleChange}
               placeholder="회사 주소를 입력하세요"
               required
+              autoComplete="off"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -297,6 +316,7 @@ function EmployerSignup() {
                 placeholder="8자 이상 입력하세요"
                 required
                 minLength={8}
+                autoComplete="new-password"
                 style={{
                   width: '100%',
                   padding: '12px 40px 12px 12px',
@@ -336,6 +356,7 @@ function EmployerSignup() {
                 onChange={handleChange}
                 placeholder="비밀번호를 다시 입력하세요"
                 required
+                autoComplete="new-password"
                 style={{
                   width: '100%',
                   padding: '12px 40px 12px 12px',

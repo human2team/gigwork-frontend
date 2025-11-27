@@ -10,6 +10,9 @@ interface JobPreferences {
   hourly_wage: number | null
   requirements: string | null
   category: string | null
+  categories?: string | null
+  job_text?: string | null
+  person_text?: string | null
 }
 
 interface JobPreferencesCardProps {
@@ -21,87 +24,16 @@ function JobPreferencesCard({ preferences, onReset }: JobPreferencesCardProps) {
   const hasAnyValue = Object.values(preferences).some(val => val !== null)
 
   const preferenceItems = [
-    {
-      key: 'place',
-      label: '지역',
-      icon: MapPin,
-      color: '#2196f3',
-      bgColor: '#e3f2fd',
-      value: preferences.place,
-      placeholder: '미입력'
-    },
-    {
-      key: 'category',
-      label: '직종',
-      icon: Briefcase,
-      color: '#4caf50',
-      bgColor: '#e8f5e9',
-      value: preferences.category,
-      placeholder: '미입력'
-    },
-    {
-      key: 'work_days',
-      label: '근무일',
-      icon: Calendar,
-      color: '#ff9800',
-      bgColor: '#fff3e0',
-      value: preferences.work_days,
-      placeholder: '미입력'
-    },
-    {
-      key: 'hourly_wage',
-      label: '시급',
-      icon: DollarSign,
-      color: '#9c27b0',
-      bgColor: '#f3e5f5',
-      value: preferences.hourly_wage ? `${preferences.hourly_wage.toLocaleString()}원` : null,
-      placeholder: '미입력'
-    },
-    {
-      key: 'start_time',
-      label: '시작시간',
-      icon: Clock,
-      color: '#e91e63',
-      bgColor: '#fce4ec',
-      value: preferences.start_time,
-      placeholder: '미입력'
-    },
-    {
-      key: 'end_time',
-      label: '종료시간',
-      icon: Clock,
-      color: '#e91e63',
-      bgColor: '#fce4ec',
-      value: preferences.end_time,
-      placeholder: '미입력'
-    },
-    {
-      key: 'gender',
-      label: '성별',
-      icon: User,
-      color: '#00bcd4',
-      bgColor: '#e0f7fa',
-      value: preferences.gender,
-      placeholder: '미입력'
-    },
-    {
-      key: 'age',
-      label: '나이',
-      icon: Hash,
-      color: '#ff5722',
-      bgColor: '#fbe9e7',
-      value: preferences.age ? `${preferences.age}세` : null,
-      placeholder: '미입력'
-    },
-    {
-      key: 'requirements',
-      label: '요구사항',
-      icon: FileText,
-      color: '#607d8b',
-      bgColor: '#eceff1',
-      value: preferences.requirements,
-      placeholder: '미입력'
-    }
+    { key: 'job_text', label: '하고 싶은 일', icon: FileText, color: '#607d8b', bgColor: '#eceff1', value: preferences.job_text, placeholder: '미입력' },
+    { key: 'person_text', label: '내 정보', icon: FileText, color: '#455a64', bgColor: '#e8ecef', value: preferences.person_text, placeholder: '미입력' },
+    { key: 'place', label: '지역', icon: MapPin, color: '#2196f3', bgColor: '#e3f2fd', value: preferences.place, placeholder: '미입력' },
+    { key: 'category', label: '직종', icon: Briefcase, color: '#4caf50', bgColor: '#e8f5e9', value: preferences.categories || preferences.category, placeholder: '미입력' },
+    { key: 'work_days', label: '근무일', icon: Calendar, color: '#ff9800', bgColor: '#fff3e0', value: preferences.work_days, placeholder: '미입력' },
+    { key: 'hourly_wage', label: '시급', icon: DollarSign, color: '#9c27b0', bgColor: '#f3e5f5', value: preferences.hourly_wage ? `${preferences.hourly_wage.toLocaleString()}원` : null, placeholder: '미입력' },
+    { key: 'start_time', label: '시작시간', icon: Clock, color: '#e91e63', bgColor: '#fce4ec', value: preferences.start_time, placeholder: '미입력' },
+    { key: 'end_time', label: '종료시간', icon: Clock, color: '#e91e63', bgColor: '#fce4ec', value: preferences.end_time, placeholder: '미입력' },
+    { key: 'gender', label: '성별', icon: User, color: '#00bcd4', bgColor: '#e0f7fa', value: preferences.gender, placeholder: '미입력' },
+    { key: 'age', label: '나이', icon: Hash, color: '#ff5722', bgColor: '#fbe9e7', value: preferences.age ? `${preferences.age}세` : null, placeholder: '미입력' }
   ]
 
   return (
@@ -190,14 +122,15 @@ function JobPreferencesCard({ preferences, onReset }: JobPreferencesCardProps) {
               key={item.key}
               style={{ 
                 display: 'flex', 
-                alignItems: 'center', 
+                alignItems: 'flex-start', 
                 gap: '10px', 
-                padding: '10px 12px',
+                padding: '12px',
                 backgroundColor: hasValue ? item.bgColor : '#fafafa',
                 border: hasValue ? `2px solid ${item.color}20` : '2px dashed #e0e0e0',
                 borderRadius: '8px',
                 transition: 'all 0.3s',
-                minHeight: '56px'
+                boxSizing: 'border-box',
+                width: '100%'
               }}
             >
               <div style={{
@@ -227,9 +160,10 @@ function JobPreferencesCard({ preferences, onReset }: JobPreferencesCardProps) {
                   fontSize: '14px', 
                   fontWeight: hasValue ? '600' : '400',
                   color: hasValue ? '#333' : '#bbb',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'anywhere',
+                  lineHeight: 1.6
                 }}>
                   {hasValue ? item.value : item.placeholder}
                 </div>
@@ -238,8 +172,6 @@ function JobPreferencesCard({ preferences, onReset }: JobPreferencesCardProps) {
           )
         })}
       </div>
-
-
 
       {/* 빈 상태 메시지 */}
       {!hasAnyValue && (
@@ -254,14 +186,14 @@ function JobPreferencesCard({ preferences, onReset }: JobPreferencesCardProps) {
           flexDirection: 'column',
           justifyContent: 'center'
         }}>
-          <div style={{ fontSize: '32px', marginBottom: '8px' }}>💬</div>
+          <div style={{ fontSize: '32px', marginBottom: '8px' }}>🗂️</div>
           <div style={{ fontWeight: '600', marginBottom: '6px', color: '#666', fontSize: '14px' }}>
             입력된 조건 없음
           </div>
           <div style={{ fontSize: '12px' }}>
-            챗봇에 조건을 말씀하시면<br />
+            챗봇에 조건을 말해주시면<br />
             AI가 자동으로 분석하여<br />
-            여기에 표시합니다.
+            여기에 표시됩니다
           </div>
         </div>
       )}

@@ -22,7 +22,8 @@ const getDaysAgo = (dateString: string): string => {
     nn.setHours(0, 0, 0, 0)
     return dn.getTime() === nn.getTime()
   })()
-  if (sameDay && hours < 6) return minutes < 1 ? '방금 전' : '최근'
+  // 같은 날이면 시간대 보정 이슈로 몇 시간 차이가 나도 '최근'으로 표시
+  if (sameDay) return minutes < 1 ? '방금 전' : '최근'
 
   if (minutes < 1) return '방금 전'
   if (minutes < 60) return `${minutes}분 전`
@@ -231,6 +232,30 @@ function JobSearch() {
     }
   }, [])
 
+  // 서버에서 저장된 일자리 동기화 (로그인 상태일 때)
+  useEffect(() => {
+    const userId = localStorage.getItem('userId')
+    if (!userId) return
+    const fetchSaved = async () => {
+      try {
+        const res = await fetch(`/api/jobseeker/saved-jobs/${userId}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data)) {
+            const ids = data
+              .map((j: any) => Number(j.id))
+              .filter((v: any) => Number.isFinite(v))
+            setSavedJobIds(ids)
+            localStorage.setItem('savedJobs', JSON.stringify(ids))
+          }
+        }
+      } catch {
+        // ignore network errors; keep local state
+      }
+    }
+    fetchSaved()
+  }, [])
+
   // 필터 변경 시 페이지 리셋
   useEffect(() => {
     setCurrentPage(1)
@@ -257,6 +282,7 @@ function JobSearch() {
             description: job.description || '',
             type: '파트타임',
             posted: job.postedDate ? getDaysAgo(job.postedDate) : '최근',
+            postedAtTs: (() => { const t = new Date(job.postedDate || '').getTime(); return Number.isFinite(t) ? t : 0 })(),
             gender: job.gender || '무관',
             age: job.age || '무관',
             education: job.education || '무관',
@@ -369,12 +395,18 @@ function JobSearch() {
     
     return matchesSearch && matchesLocation && matchesCategory
   })
+  // 등록일 내림차순 정렬(최신 우선)
+  const sortedJobs = [...filteredJobs].sort((a: any, b: any) => {
+    const at = Number(a.postedAtTs || 0)
+    const bt = Number(b.postedAtTs || 0)
+    return bt - at
+  })
 
   // 페이지네이션 계산
-  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PER_PAGE))
+  const totalPages = Math.max(1, Math.ceil(sortedJobs.length / PER_PAGE))
   const currentSafePage = Math.min(currentPage, totalPages)
   const startIndex = (currentSafePage - 1) * PER_PAGE
-  const pageJobs = filteredJobs.slice(startIndex, startIndex + PER_PAGE)
+  const pageJobs = sortedJobs.slice(startIndex, startIndex + PER_PAGE)
 
   // 필터링된 지역
   const filteredRegions = regions.filter(region =>
@@ -686,7 +718,7 @@ function JobSearch() {
       </div>
 
       {/* 테이블 스타일 목록 */}
-      {filteredJobs.length === 0 ? (
+      {sortedJobs.length === 0 ? (
         <div style={{
           padding: '48px',
           textAlign: 'center',

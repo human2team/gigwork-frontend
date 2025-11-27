@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { apiCall, getErrorMessage } from '../utils/api';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, DollarSign, ArrowRight } from 'lucide-react';
+import { MapPin, DollarSign, ArrowRight, CheckCircle } from 'lucide-react';
 
 interface Proposal {
   id: number;
@@ -201,7 +201,19 @@ export default function JobseekerProposals() {
       <h2 style={{ fontSize: '22px', fontWeight: 'bold', marginBottom: 16 }}>제안받은 일자리</h2>
       {loading && <div>로딩 중...</div>}
       {error && <div style={{ color: 'red' }}>에러: {error}</div>}
-      {!loading && !error && proposals.length === 0 && <div>아직 받은 제안이 없습니다.</div>}
+      {!loading && !error && proposals.length === 0 && (
+        <div style={{
+          padding: '48px',
+          textAlign: 'center',
+          backgroundColor: '#f9f9f9',
+          borderRadius: '8px',
+          border: '1px solid #e0e0e0'
+        }}>
+          <CheckCircle size={48} color="#999" style={{ marginBottom: '16px', opacity: 0.5 }} />
+          <p style={{ fontSize: '16px', color: '#666', marginBottom: '8px' }}>제안받은 일자리가 없습니다</p>
+          <p style={{ fontSize: '14px', color: '#999' }}>사업자가 보낸 채용 제안이 여기에 표시됩니다.</p>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}>
         {proposals.map((proposal) => {
