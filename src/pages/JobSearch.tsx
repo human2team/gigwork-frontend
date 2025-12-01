@@ -276,6 +276,7 @@ function JobSearch() {
             category: job.category || '',
             company: job.company || '',
             location: job.location || '',
+            addressDetail: job.addressDetail || '',
             salary: job.salaryType && job.salary ? `${job.salaryType} ${job.salary}` : job.salary || '협의',
             salaryType: job.salaryType || null,
             salaryRaw: job.salary || null,
@@ -808,7 +809,10 @@ function JobSearch() {
                   </button>
                 </div>
                 {/* 근무지 */}
-                <div style={{ fontSize: '14px', color: '#555', marginLeft: -50 }}>{job.location}</div>
+                <div style={{ fontSize: '14px', color: '#555', marginLeft: -80 }}>
+                  {job.location}
+                  {job.addressDetail ? ` ${job.addressDetail}` : ''}
+                </div>
                 {/* 근무시간 */}
                 <div style={{ fontSize: '14px', color: '#555', marginLeft: -10 }}>{workTime}</div>
                 {/* 급여 */}
@@ -819,7 +823,8 @@ function JobSearch() {
                     color: '#2196f3',
                     borderRadius: 4,
                     fontSize: '12px',
-                    fontWeight: 700
+                    fontWeight: 700,
+                    marginLeft: -30
                   }}>
                     {salaryBadge || '급여'}
                   </span>
@@ -830,7 +835,7 @@ function JobSearch() {
                 {/* 등록일 */}
                 <div style={{ fontSize: '13px', color: '#999' }}>{job.posted}</div>
                 {/* 마감일 */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: -10 }}>
                   <span style={{ fontSize: '13px', color: isClosed ? '#d32f2f' : '#666', fontWeight: isClosed ? 700 as any : 400 }}>
                     {formatDate(job.deadline) || '-'}
                   </span>

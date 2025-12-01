@@ -445,15 +445,44 @@ export default function ProposalDetail() {
         </section>
       ) : null}
 
-      {Array.isArray(proposal.job.requirements) && proposal.job.requirements.length > 0 && (
+      {((Array.isArray(proposal.job.requirements) && proposal.job.requirements.filter((req: string) => {
+        if (!req || !req.trim()) return false
+        // "기타(직접입력)" 완전히 제외
+        if (req.trim() === '기타(직접입력)' || req.includes('기타(직접입력)')) return false
+        // "기타:"로 시작하는 것 제외
+        if (/^기타\s*:?\s*/.test(req.trim())) return false
+        return true
+      }).length > 0) || (proposal.job.otherRequirement && proposal.job.otherRequirement.trim())) && (
         <section style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e0e0e0' }}>
           <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <BookOpen size={24} style={{ color: '#2196f3' }} /> 필요 준비물/능력
           </h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {Array.isArray(proposal.job.requirements) && proposal.job.requirements.map((req: string, index: number) => (
+            {Array.isArray(proposal.job.requirements) && proposal.job.requirements
+              .filter((req: string) => {
+                if (!req || !req.trim()) return false
+                // "기타(직접입력)" 완전히 제외
+                if (req.trim() === '기타(직접입력)' || req.includes('기타(직접입력)')) return false
+                // "기타:"로 시작하는 것 제외
+                if (/^기타\s*:?\s*/.test(req.trim())) return false
+                return true
+              })
+              .map((req: string, index: number) => (
+                <span
+                  key={index}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#f5f5f5',
+                    color: '#333',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  {req}
+                </span>
+              ))}
+            {proposal.job.otherRequirement && proposal.job.otherRequirement.trim() && (
               <span
-                key={index}
                 style={{
                   padding: '8px 16px',
                   backgroundColor: '#f5f5f5',
@@ -462,20 +491,8 @@ export default function ProposalDetail() {
                   fontSize: '14px'
                 }}
               >
-                {req}
-              </span>
-            ))}
-            {proposal.job.otherRequirement && (
-              <span
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#f5f5f5',
-                  color: '#333',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              >
-                기타: {proposal.job.otherRequirement}
+                {/* "기타:" 또는 "기타 :" 등 모든 변형 제거 */}
+                {proposal.job.otherRequirement.replace(/^기타\s*:?\s*/i, '').trim()}
               </span>
             )}
           </div>

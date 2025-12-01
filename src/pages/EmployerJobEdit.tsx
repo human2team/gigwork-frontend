@@ -12,6 +12,7 @@ function EmployerJobEdit() {
     category: '',
     company: '',
     location: '',
+    addressDetail: '',
     description: '',
     qualifications: [''],
     requirements: [] as string[],
@@ -152,6 +153,7 @@ function EmployerJobEdit() {
           category: job.category || '',
           company: job.company || '',
           location: job.location || '',
+          addressDetail: job.addressDetail || '',
           description: job.description || '',
           qualifications: job.qualifications && job.qualifications.length > 0 ? job.qualifications : [''],
           requirements: job.requirements || [],
@@ -392,6 +394,12 @@ function EmployerJobEdit() {
       return
     }
     
+    // 시간 포맷을 HH:MM으로 강제 (초 제거)
+    const toHHMM = (t: string) => {
+      if (!t) return '';
+      const [h, m] = t.split(':');
+      return h && m ? `${h.padStart(2, '0')}:${m.padStart(2, '0')}` : t;
+    };
     try {
       const requestData = {
         title: formData.title,
@@ -404,16 +412,19 @@ function EmployerJobEdit() {
           : (selectedJobSub?.nm || formData.category)),
         company: formData.company,
         location: formData.location,
+        addressDetail: formData.addressDetail,
         region: selectedRegion,
         district: selectedDistrict,
         dong: selectedDong,
         description: formData.description,
         qualifications: formData.qualifications.filter(q => q.trim() !== ''),
-        requirements: formData.requirements,
-        otherRequirement: formData.otherRequirement,
+        requirements: formData.requirements.filter(r => r !== '기타(직접입력)'),
+        otherRequirement: formData.otherRequirement 
+          ? formData.otherRequirement.replace(/^기타\s*:?\s*/i, '').trim()
+          : '',
         workingDays: formData.workingDays,
-        startTime: formData.startTime,
-        endTime: formData.endTime,
+        startTime: toHHMM(formData.startTime),
+        endTime: toHHMM(formData.endTime),
         salary: formData.salary,
         salaryType: formData.salaryType,
         deadline: formData.deadline,
@@ -641,7 +652,9 @@ function EmployerJobEdit() {
                     justifyContent: 'space-between'
                   }}
                 >
-                  <span>{selectedRegion ? [selectedRegion, selectedDistrict, selectedDong].filter(Boolean).join(' ') : '지역 선택'}</span>
+                  <span>{selectedRegion
+                    ? ([selectedRegion, selectedDistrict, selectedDong].filter(Boolean).join(' ') + (formData.addressDetail ? ' ' + formData.addressDetail : ''))
+                    : '지역 선택'}</span>
                   <ChevronDown size={18} color="#999" />
                 </button>
               </div>
@@ -732,6 +745,26 @@ function EmployerJobEdit() {
                 </div>
               </div>
             )}
+            {/* 상세주소 입력 */}
+            <div style={{ marginTop: '16px' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+                상세 주소
+              </label>
+              <input
+                type="text"
+                name="addressDetail"
+                value={formData.addressDetail}
+                onChange={handleChange}
+                placeholder="상세 주소를 입력하세요 (예: 건물명, 호수 등)"
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '6px',
+                  fontSize: '16px'
+                }}
+              />
+            </div>
             </div>
             <div>
               <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>

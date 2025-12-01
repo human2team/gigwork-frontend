@@ -13,6 +13,7 @@ function JobPosting() {
     category: '',
     company: '',
     location: '',
+    addressDetail: '',
     description: '',
     qualifications: [''],
     requirements: [] as string[],
@@ -371,9 +372,9 @@ function JobPosting() {
       const startM = (() => { const [h,m] = (formData.startTime||'00:00').split(':').map(Number); return h*60+(m||0) })()
       const endM = (() => { const [h,m] = (formData.endTime||'00:00').split(':').map(Number); return h*60+(m||0) })()
       const diffMin = Math.max(0, endM - startM)
-      const toHHMMSS = (t: string) => (t && t.length === 5) ? `${t}:00` : (t || '00:00:00')
-      const startTimeSec = toHHMMSS(formData.startTime)
-      const endTimeSec = toHHMMSS(formData.endTime)
+      const toHHMM = (t: string) => (t && t.length >= 5) ? t.slice(0, 5) : (t || '00:00')
+      const startTimeSec = toHHMM(formData.startTime)
+      const endTimeSec = toHHMM(formData.endTime)
       const workHoursStr = `${startTimeSec}~${endTimeSec}`
       const jobTypeDerived = diffMin >= 480 ? '풀타임' : '파트타임'
       const postedDateIso = new Date().toISOString()
@@ -406,7 +407,7 @@ function JobPosting() {
           ? (jobMainCats.find(m => m.cd === selectedJobMainCd)?.nm || formData.category)
           : (selectedJobSub?.nm || formData.category)).slice(0, MAX_VARCHAR),
         company: formData.company.slice(0, MAX_VARCHAR),
-        location: formData.location.slice(0, MAX_VARCHAR),
+        location: (selectedRegion === '서울' && selectedDistrict === '전체' && selectedDong === '전체') ? '' : formData.location.slice(0, MAX_VARCHAR),
         region: selectedRegion.slice(0, MAX_VARCHAR),
         district: selectedDistrict.slice(0, MAX_VARCHAR),
         dong: (selectedDong || '').slice(0, MAX_VARCHAR),
@@ -415,8 +416,10 @@ function JobPosting() {
         qualifications: formData.qualifications
           .filter(q => q.trim() !== '')
           .map(q => q.slice(0, 60)),
-        requirements: formData.requirements,
-        otherRequirement: formData.otherRequirement.slice(0, MAX_VARCHAR),
+        requirements: formData.requirements.filter(r => r !== '기타(직접입력)'),
+        otherRequirement: formData.otherRequirement 
+          ? formData.otherRequirement.replace(/^기타\s*:?\s*/i, '').trim().slice(0, MAX_VARCHAR)
+          : '',
         // 백엔드 컬럼명과 매핑: work_days / work_hours 로 매핑될 수 있도록 키 이름 맞춤
         workDays: workDaysJoined,
         work_days: workDaysJoined, // alias for backend snake_case
@@ -669,7 +672,17 @@ function JobPosting() {
                     justifyContent: 'space-between'
                   }}
                 >
-                  <span>{selectedRegion ? [selectedRegion, selectedDistrict, selectedDong].filter(Boolean).join(' ') : '지역 선택'}</span>
+                  <span
+                    style={
+                      selectedRegion === '서울' && selectedDistrict === '전체' && selectedDong === '전체'
+                        ? { color: '#bdbdbd', fontSize: '16px' }
+                        : { color: '#333', fontSize: '16px', fontWeight: '500' }
+                    }
+                  >
+                    {selectedRegion === '서울' && selectedDistrict === '전체' && selectedDong === '전체'
+                      ? '근무지를 입력하세요'
+                      : ([selectedRegion, selectedDistrict, selectedDong].filter(Boolean).join(' ') + (formData.addressDetail ? ' ' + formData.addressDetail : ''))}
+                  </span>
                   <ChevronDown size={18} color="#999" />
                 </button>
               </div>
@@ -748,7 +761,7 @@ function JobPosting() {
                                   checked={selected}
                                   onChange={() => { 
                                     setSelectedDong(dong.name === '전체' ? '' : dong.name);
-                                    setFormData(prev => ({ ...prev, location: `${selectedRegion} ${selectedDistrict} ${dong.name === '전체' ? '' : dong.name}`.trim() })) 
+                                    setFormData(prev => ({ ...prev, location: [selectedRegion, selectedDistrict, dong.name === '전체' ? '' : dong.name, formData.addressDetail].filter(Boolean).join(' ') }))
                                   }}
                                 />
                                 <span style={{ fontSize: 13, color: selected ? '#2196f3' : '#333', whiteSpace: 'nowrap' }}>{dong.name}</span>
@@ -759,6 +772,34 @@ function JobPosting() {
                       ) : (
                         <div style={{ fontSize: 13, color: '#999' }}>구/군을 먼저 선택하세요</div>
                       )}
+                      {/* 상세 주소 입력란 */}
+                      <div style={{ marginTop: 16 }}>
+                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>
+                          상세 주소
+                        </label>
+                        <input
+                          type="text"
+                          name="addressDetail"
+                          value={formData.addressDetail}
+                          onChange={e => {
+                            const value = e.target.value.slice(0, MAX_VARCHAR)
+                            setFormData(prev => ({
+                              ...prev,
+                              addressDetail: value,
+                              location: [selectedRegion, selectedDistrict, selectedDong, value].filter(Boolean).join(' ')
+                            }))
+                          }}
+                          placeholder="상세 주소를 입력하세요 (예: 123-45 롯데백화점 5층)"
+                          style={{
+                            width: '100%',
+                            padding: '12px',
+                            border: '1px solid #e0e0e0',
+                            borderRadius: '6px',
+                            fontSize: '16px',
+                            marginTop: '8px'
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 10 }}>

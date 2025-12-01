@@ -144,7 +144,10 @@ export default function CandidateDetail() {
                 <label style={{ display: 'block', fontSize: '14px', color: '#666', marginBottom: '8px' }}>주소</label>
                 <div style={{ fontSize: '16px', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <MapPin size={16} color="#666" />
-                  {profile.region} {profile.address}
+                  {profile.address && profile.region && profile.address.startsWith(profile.region)
+                    ? profile.address
+                    : [profile.region, profile.address].filter(Boolean).join(' ')
+                  }
                 </div>
               </div>
               <div>

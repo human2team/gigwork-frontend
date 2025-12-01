@@ -1,10 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { MapPin, Calendar, Clock, DollarSign, Check } from 'lucide-react'
-
-declare global {
-  interface Window { kakao: any }
-}
+import KakaoMap from '../components/KakaoMap';
 
 function JobDetails() {
   const { id } = useParams()
@@ -14,32 +11,6 @@ function JobDetails() {
   const [isApplying, setIsApplying] = useState(false)
   const [hasApplied, setHasApplied] = useState(false)
   const [applicationId, setApplicationId] = useState<number | null>(null)
-
-  // Kakao Map refs
-  const mapEl = useRef<HTMLDivElement | null>(null)
-  const mapRef = useRef<any>(null)
-  const markerRef = useRef<any>(null)
-  const geocoderRef = useRef<any>(null)
-
-  // SDK 로더
-  const loadKakao = () =>
-    new Promise<any>((resolve) => {
-      // 이미 로드됨
-      if (window.kakao && window.kakao.maps) return resolve(window.kakao)
-      // 스크립트 존재하면 onload 대기
-      const existing = document.getElementById('kakao-maps-sdk') as HTMLScriptElement | null
-      if (existing) {
-        if ((window as any).kakao && (window as any).kakao.maps) return resolve((window as any).kakao)
-        existing.addEventListener('load', () => resolve((window as any).kakao))
-        return
-      }
-      // 동적 주입 (index.html 로드 실패 대비)
-      const s = document.createElement('script')
-      s.id = 'kakao-maps-sdk'
-      s.src = 'https://dapi.kakao.com/v2/maps/sdk.js?appkey=0e70b22aff0457c53528a49d4ea6034f&autoload=false&libraries=services'
-      s.onload = () => resolve((window as any).kakao)
-      document.head.appendChild(s)
-    })
 
   // 지원취소 버튼 핸들러
   const handleCancelApplication = async () => {
@@ -53,6 +24,8 @@ function JobDetails() {
     }
 
     const userId = localStorage.getItem('userId')
+  
+  // 지도 표시 영역 추가
     setIsApplying(true)
 
     try {
@@ -138,6 +111,12 @@ function JobDetails() {
   useEffect(() => {
     const checkApplicationStatus = async () => {
       if (!id) return
+          {fullAddress && (
+            <div style={{ margin: '16px 0' }}>
+              {/* 지도 표시 */}
+              <KakaoMap address={fullAddress} height="320px" />
+            </div>
+          )}
 
       const userId = localStorage.getItem('userId')
       const userType = localStorage.getItem('userType')
@@ -202,6 +181,7 @@ function JobDetails() {
             category: data.category || '',
             company: data.company || '',
             location: data.location || '',
+            addressDetail: data.addressDetail || '',
             postedDate: data.postedDate ? new Date(data.postedDate).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : '최근',
             tags: ['파트타임'], // 기본 태그
             description: data.description || '',
@@ -247,61 +227,17 @@ function JobDetails() {
     }
   }, [id])
 
-  // 지도 초기화 (ref 준비 타이밍을 보강)
-  const initMapOnce = useRef(false)
-  useEffect(() => {
-    const init = async () => {
-      if (initMapOnce.current) return
-      if (!mapEl.current) {
-        // 다음 프레임에 재시도
-        requestAnimationFrame(init)
-        return
-      }
-      const kakao = await loadKakao()
-      kakao.maps.load(() => {
-        const center = new kakao.maps.LatLng(37.5665, 126.9780) // 서울 시청
-        const map = new kakao.maps.Map(mapEl.current!, { center, level: 5 })
-        try { console.log('[KAKAO] map created', map) } catch {}
-        const marker = new kakao.maps.Marker({ position: center })
-        marker.setMap(map)
-        mapRef.current = map
-        markerRef.current = marker
-        geocoderRef.current = new kakao.maps.services.Geocoder()
-        // 초기 레이아웃 강제 업데이트(부모 레이아웃 변화 대응)
-        setTimeout(() => { try { map.relayout() } catch {} }, 0)
-        kakao.maps.event.addListener(map, 'tilesloaded', () => {
-          try { console.log('[KAKAO] tiles loaded') } catch {}
-        })
-        initMapOnce.current = true
-      })
-    }
-    init()
-  }, [])
-
-  // 주소 조합(상세주소가 있다면 우선 사용하도록 확장 가능)
-  const fullAddress = useMemo(() => {
-    const candidates = [
-      job?.location,
-      [job?.region, job?.district, job?.dong].filter(Boolean).join(' ')
-    ].filter((v) => !!v && String(v).trim().length > 0)
-    return candidates[0] || ''
-  }, [job])
-
-  // 주소 변경 시 지오코딩
-  useEffect(() => {
-    const kakao = (window as any).kakao
-    if (!kakao || !geocoderRef.current || !mapRef.current || !markerRef.current) return
-    if (!fullAddress) return
-    geocoderRef.current.addressSearch(fullAddress, (result: any[], status: string) => {
-      if (status !== kakao.maps.services.Status.OK || result.length === 0) return
-      const { x, y } = result[0]
-      const pos = new kakao.maps.LatLng(Number(y), Number(x))
-      mapRef.current.setCenter(pos)
-      markerRef.current.setPosition(pos)
-      try { mapRef.current.relayout() } catch {}
-      try { console.log('[KAKAO] geocoded:', fullAddress, { lat: Number(y), lng: Number(x) }) } catch {}
-    })
-  }, [fullAddress])
+  // 주소 조합 (JobPosting에서 저장한 location 필드 사용, 없으면 region/district/dong 조합)
+ const fullAddress = useMemo(() => {
+  if (!job) return '';
+  let addr = job.location && job.location.trim() ? job.location.trim() : '';
+  if (job.addressDetail && job.addressDetail.trim()) {
+    addr += ` ${job.addressDetail.trim()}`;
+  }
+  if (addr) return addr;
+  const parts = [job.region, job.district, job.dong].filter(Boolean);
+  return parts.length > 0 ? parts.join(' ') : '';
+}, [job]);
 
   if (loading) {
     return (
@@ -376,6 +312,7 @@ function JobDetails() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <MapPin size={18} />
             {job.location}
+            {job.addressDetail ? ` ${job.addressDetail}` : ''}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Calendar size={18} />
@@ -383,22 +320,6 @@ function JobDetails() {
           </div>
         </div>
 
-        {/* 근무지역 지도 */}
-        <section style={{ marginTop: '12px' }}>
-          <div style={{ fontSize: '13px', color: '#666', marginBottom: '6px' }}>
-            근무지역: {fullAddress || '-'}
-          </div>
-          <div
-            ref={mapEl}
-            style={{
-              width: '100%',
-              height: 300,
-              border: '1px solid #e0e0e0',
-              borderRadius: 8,
-              background: '#fafafa'
-            }}
-          />
-        </section>
 
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px' }}>
           {job.tags.map((tag: string, index: number) => (
@@ -442,13 +363,42 @@ function JobDetails() {
         </section>
       )}
 
-      {job.requirements && job.requirements.length > 0 && (
+      {((job.requirements && job.requirements.filter((req: string) => {
+        if (!req || !req.trim()) return false
+        // "기타(직접입력)" 완전히 제외
+        if (req.trim() === '기타(직접입력)' || req.includes('기타(직접입력)')) return false
+        // "기타:"로 시작하는 것 제외
+        if (/^기타\s*:?\s*/.test(req.trim())) return false
+        return true
+      }).length > 0) || (job.otherRequirement && job.otherRequirement.trim())) && (
         <section style={{ marginBottom: '32px' }}>
           <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>필요 준비물/능력</h2>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {job.requirements.map((req: string, index: number) => (
+            {(job.requirements || [])
+              .filter((req: string) => {
+                if (!req || !req.trim()) return false
+                // "기타(직접입력)" 완전히 제외
+                if (req.trim() === '기타(직접입력)' || req.includes('기타(직접입력)')) return false
+                // "기타:"로 시작하는 것 제외
+                if (/^기타\s*:?\s*/.test(req.trim())) return false
+                return true
+              })
+              .map((req: string, index: number) => (
+                <span
+                  key={index}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#f5f5f5',
+                    color: '#333',
+                    borderRadius: '6px',
+                    fontSize: '14px'
+                  }}
+                >
+                  {req}
+                </span>
+              ))}
+            {job.otherRequirement && job.otherRequirement.trim() && (
               <span
-                key={index}
                 style={{
                   padding: '8px 16px',
                   backgroundColor: '#f5f5f5',
@@ -457,20 +407,8 @@ function JobDetails() {
                   fontSize: '14px'
                 }}
               >
-                {req}
-              </span>
-            ))}
-            {job.otherRequirement && (
-              <span
-                style={{
-                  padding: '8px 16px',
-                  backgroundColor: '#f5f5f5',
-                  color: '#333',
-                  borderRadius: '6px',
-                  fontSize: '14px'
-                }}
-              >
-                기타: {job.otherRequirement}
+                {/* "기타:" 또는 "기타 :" 등 모든 변형 제거 */}
+                {job.otherRequirement.replace(/^기타\s*:?\s*/i, '').trim()}
               </span>
             )}
           </div>
@@ -541,6 +479,17 @@ function JobDetails() {
             </div>
           )}
         </div>
+      </section>
+
+      <section style={{ marginBottom: '32px' }}>
+        <div style={{  color: '#666', fontSize: '15px', marginBottom: '8px', fontWeight: '600' }}>
+          근무지역: {fullAddress || '-'}
+        </div>
+        {fullAddress && (
+          <div style={{ margin: '16px 0' }}>
+            <KakaoMap address={fullAddress} height="320px" />
+          </div>
+        )}
       </section>
 
       <div style={{ textAlign: 'center', marginTop: '48px', display: 'flex', gap: '16px', justifyContent: 'center' }}>

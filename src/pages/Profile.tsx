@@ -987,8 +987,8 @@ function Profile() {
     const fetchApplications = async () => {
       try {
         const response = await apiCall(`/api/jobseeker/applications/${userId}`, { method: 'GET' })
-          if (Array.isArray(response)) {
-            const formattedJobs = response.map((app: any) => ({
+        if (Array.isArray(response)) {
+          const formattedJobs = response.map((app: any) => ({
             id: app.jobId,
             applicationId: app.id, // 지원서 ID (삭제용)
             title: app.jobTitle,
@@ -1293,25 +1293,25 @@ function Profile() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', maxWidth: '800px' }}>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>최종학력 <span style={{ color: '#f44336' }}>*</span></label>
-                <select
-                  value={personalInfo.education}
-                  onChange={(e) => setPersonalInfo({ ...personalInfo, education: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #e0e0e0',
-                    borderRadius: '6px',
-                    fontSize: '16px'
-                  }}
-                >
-                  <option value="">선택하세요</option>
-                  <option value="초등학교">초등학교</option>
-                  <option value="중학교">중학교</option>
-                  <option value="고등학교">고등학교</option>
-                  <option value="대학(2,3년제)">대학(2,3년제)</option>
-                  <option value="대학(4년제)">대학(4년제)</option>
-                  <option value="대학원">대학원</option>
-                </select>
+              <select
+                value={personalInfo.education}
+                onChange={(e) => setPersonalInfo({ ...personalInfo, education: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #e0e0e0',
+                  borderRadius: '6px',
+                  fontSize: '16px'
+                }}
+              >
+                <option value="">선택하세요</option>
+                <option value="초등학교">초등학교</option>
+                <option value="중학교">중학교</option>
+                <option value="고등학교">고등학교</option>
+                <option value="대학(2,3년제)">대학(2,3년제)</option>
+                <option value="대학(4년제)">대학(4년제)</option>
+                <option value="대학원">대학원</option>
+              </select>
               </div>
               <div>
                 <label style={{ display: 'block', marginBottom: '8px', fontSize: '14px', fontWeight: '500' }}>나의 MBTI</label>
@@ -1341,7 +1341,7 @@ function Profile() {
               <Briefcase size={20} color="#2196f3" />
               희망근무조건 <span style={{ color: '#f44336', fontWeight: 700 }}>*</span>
             </h3>
-              <div style={{ marginBottom: '24px' }}>
+            <div style={{ marginBottom: '24px' }}>
               <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>지역선택</h4>
               <div style={{ display: 'flex', gap: '12px', maxWidth: '800px' }}>
                 {/* 시/도 선택 */}
@@ -1391,8 +1391,8 @@ function Profile() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation()
-                            setPersonalInfo({
-                              ...personalInfo,
+                            setPersonalInfo({ 
+                              ...personalInfo, 
                               preferredRegion: '전체',
                               preferredDistrict: '전체',
                               preferredDong: '전체'
@@ -1441,11 +1441,11 @@ function Profile() {
                               color: personalInfo.preferredRegion === region.name ? '#2196f3' : '#333',
                               cursor: 'pointer',
                               fontSize: '16px'
-                            }}
-                          >
+                          }}
+                        >
                             {region.name}
-                          </button>
-                        ))}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -1498,8 +1498,8 @@ function Profile() {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setPersonalInfo({
-                                ...personalInfo,
+                              setPersonalInfo({ 
+                                ...personalInfo, 
                                 preferredDistrict: '전체',
                                 preferredDong: '전체'
                               })
@@ -1544,11 +1544,11 @@ function Profile() {
                                 color: personalInfo.preferredDistrict === district.name ? '#2196f3' : '#333',
                                 cursor: 'pointer',
                                 fontSize: '16px'
-                              }}
-                            >
+                            }}
+                          >
                               {district.name}
-                            </button>
-                          ))}
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -1644,11 +1644,11 @@ function Profile() {
                                 color: personalInfo.preferredDong === dong.name ? '#2196f3' : '#333',
                                 cursor: 'pointer',
                                 fontSize: '16px'
-                              }}
-                            >
+                            }}
+                          >
                               {dong.name}
-                            </button>
-                          ))}
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -3033,7 +3033,7 @@ function Profile() {
                           <MapPin size={16} />
                           {job.location}
                         </span>
-                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <DollarSign size={16} />
                            {formatSalaryLabel((job as any).salary, (job as any).salaryType || (job as any).salary_type)}
                         </span>

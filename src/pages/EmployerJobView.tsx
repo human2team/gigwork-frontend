@@ -196,6 +196,11 @@ function EmployerJobView() {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <MapPin size={18} />
               {job.location}
+              {job.addressDetail && (
+                <span style={{ color: '#666', marginLeft: '8px', fontSize: '13px', fontWeight: 400 }}>
+                  <span style={{ color: '#2196f3', fontWeight: 500 }}>상세주소:</span> {job.addressDetail}
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Calendar size={18} />
@@ -306,15 +311,44 @@ function EmployerJobView() {
           </section>
         )}
 
-        {job.requirements && job.requirements.length > 0 && (
+        {((job.requirements && job.requirements.filter((req: string) => {
+          if (!req || !req.trim()) return false
+          // "기타(직접입력)" 완전히 제외
+          if (req.trim() === '기타(직접입력)' || req.includes('기타(직접입력)')) return false
+          // "기타:"로 시작하는 것 제외
+          if (/^기타\s*:?\s*/.test(req.trim())) return false
+          return true
+        }).length > 0) || (job.otherRequirement && job.otherRequirement.trim())) && (
           <section style={{ marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e0e0e0' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <BookOpen size={24} style={{ color: '#2196f3' }} /> 필요 준비물/능력
             </h2>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {job.requirements.map((req: string, index: number) => (
+              {(job.requirements || [])
+                .filter((req: string) => {
+                  if (!req || !req.trim()) return false
+                  // "기타(직접입력)" 완전히 제외
+                  if (req.trim() === '기타(직접입력)' || req.includes('기타(직접입력)')) return false
+                  // "기타:"로 시작하는 것 제외
+                  if (/^기타\s*:?\s*/.test(req.trim())) return false
+                  return true
+                })
+                .map((req: string, index: number) => (
+                  <span
+                    key={index}
+                    style={{
+                      padding: '8px 16px',
+                      backgroundColor: '#f5f5f5',
+                      color: '#333',
+                      borderRadius: '6px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    {req}
+                  </span>
+                ))}
+              {job.otherRequirement && job.otherRequirement.trim() && (
                 <span
-                  key={index}
                   style={{
                     padding: '8px 16px',
                     backgroundColor: '#f5f5f5',
@@ -323,20 +357,8 @@ function EmployerJobView() {
                     fontSize: '14px'
                   }}
                 >
-                  {req}
-                </span>
-              ))}
-              {job.otherRequirement && (
-                <span
-                  style={{
-                    padding: '8px 16px',
-                    backgroundColor: '#f5f5f5',
-                    color: '#333',
-                    borderRadius: '6px',
-                    fontSize: '14px'
-                  }}
-                >
-                  기타: {job.otherRequirement}
+                  {/* "기타:" 또는 "기타 :" 등 모든 변형 제거 */}
+                  {job.otherRequirement.replace(/^기타\s*:?\s*/i, '').trim()}
                 </span>
               )}
             </div>
