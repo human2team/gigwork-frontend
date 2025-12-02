@@ -411,6 +411,7 @@ function JobPosting() {
         region: selectedRegion.slice(0, MAX_VARCHAR),
         district: selectedDistrict.slice(0, MAX_VARCHAR),
         dong: (selectedDong || '').slice(0, MAX_VARCHAR),
+        addressDetail: formData.addressDetail.slice(0, MAX_VARCHAR),
         description: formData.description.slice(0, MAX_VARCHAR),
         // 배열 전송(백엔드가 ArrayList를 기대)
         qualifications: formData.qualifications

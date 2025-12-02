@@ -193,9 +193,9 @@ function EmployerJobView() {
             )}
           </div>
           <div style={{ display: 'flex', gap: '24px', marginBottom: '16px', color: '#666', fontSize: '14px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <MapPin size={18} />
-              {job.location}
+              <span>{job.location}</span>
               {job.addressDetail && (
                 <span style={{ color: '#666', marginLeft: '8px', fontSize: '13px', fontWeight: 400 }}>
                   <span style={{ color: '#2196f3', fontWeight: 500 }}>상세주소:</span> {job.addressDetail}
