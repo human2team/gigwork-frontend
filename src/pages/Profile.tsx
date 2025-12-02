@@ -58,7 +58,7 @@ type DistrictItem = { code: string; name: string }
 type DongItem = { code: string; name: string }
 
 function Profile() {
-  const { setJobseekerProfile } = useUser();
+  const { jobseekerProfile, setJobseekerProfile, updateJobseekerProfile } = useUser();
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<ProfileTab>('personal')
   const [savedJobs, setSavedJobs] = useState<SavedJob[]>([])
@@ -665,6 +665,7 @@ function Profile() {
 
   // 개인정보 저장
   const [personalInfoSaved, setPersonalInfoSaved] = useState(false)
+  const [showProfileUpdateToast, setShowProfileUpdateToast] = useState(false)
 
   const handleSavePersonalInfo = async () => {
     if (!personalInfo.name || !personalInfo.email || !personalInfo.phone || !personalInfo.birthDate) {
@@ -764,6 +765,46 @@ function Profile() {
       // 저장된 정보 업데이트
       setSavedPersonalInfo({ ...personalInfo })
       setPersonalInfoSaved(true)
+
+      // 전역 프로필(헤더 표시용)에도 즉시 반영: 여러 필드를 동기화
+      try {
+        const updatedFields: any = {
+          name: personalInfo.name,
+          email: personalInfo.email,
+          phone: personalInfo.phone,
+          birthDate: personalInfo.birthDate,
+          address: personalInfo.address,
+          education: personalInfo.education,
+          preferredRegion: personalInfo.preferredRegion,
+          preferredDistrict: personalInfo.preferredDistrict,
+          preferredDong: personalInfo.preferredDong,
+          workDuration: personalInfo.workDuration,
+          workDays: personalInfo.workDays,
+          workTime: personalInfo.workTime,
+          strengths: sanitizeStrengths(personalInfo.strengths),
+          mbti: personalInfo.mbti,
+          introduction: personalInfo.introduction
+        }
+
+        if (jobseekerProfile) {
+          setJobseekerProfile({ ...jobseekerProfile, ...updatedFields })
+        } else {
+          updateJobseekerProfile && updateJobseekerProfile(updatedFields)
+        }
+        // 헤더가 사용하는 localStorage의 userName도 동기화
+        try {
+          localStorage.setItem('userName', personalInfo.name)
+          localStorage.setItem('userEmail', personalInfo.email)
+        } catch (e) {
+          // ignore storage errors
+        }
+
+        // 작은 토스트 표시
+        setShowProfileUpdateToast(true)
+        setTimeout(() => setShowProfileUpdateToast(false), 3000)
+      } catch (e) {
+        // 안전하게 무시
+      }
       setTimeout(() => setPersonalInfoSaved(false), 3000)
       
     } catch (error) {
@@ -873,7 +914,33 @@ function Profile() {
       
       // 저장된 신체 정보 업데이트
       setSavedPhysicalData({ ...physicalData })
-      
+
+      // 전역 프로필 동기화 (신체 정보)
+      try {
+        const physUpdates: any = {
+          physicalAttributes: {
+            muscleStrength: physicalData.strength,
+            height: physicalData.height === '' ? 0 : physicalData.height,
+            weight: physicalData.weight === '' ? 0 : physicalData.weight
+          }
+        }
+        if (jobseekerProfile) {
+          setJobseekerProfile({ ...jobseekerProfile, ...physUpdates })
+        } else {
+          updateJobseekerProfile && updateJobseekerProfile(physUpdates)
+        }
+        // 물리 정보 저장 시에도 localStorage에 일부 필드 동기화
+        try {
+          // 이름/이메일은 변하지 않을 가능성이 높지만 안전하게 보존
+          if (personalInfo.name) localStorage.setItem('userName', personalInfo.name)
+          if (personalInfo.email) localStorage.setItem('userEmail', personalInfo.email)
+        } catch (e) {}
+        setShowProfileUpdateToast(true)
+        setTimeout(() => setShowProfileUpdateToast(false), 3000)
+      } catch (e) {
+        // ignore
+      }
+
       alert('✓ 신체 속성이 성공적으로 저장되었습니다!')
     } catch (error) {
       console.error('신체 속성 저장 실패:', error)

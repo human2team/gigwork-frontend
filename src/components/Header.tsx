@@ -3,11 +3,13 @@ import { LogOut, User } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useState, useEffect } from 'react'
 import { apiCall } from '../utils/api'
+import { useUser } from '../contexts/UserContext'
 
 function Header() {
   const navigate = useNavigate()
   const { isAuthenticated, logout } = useAuth()
   const [userName, setUserName] = useState('')
+  const { jobseekerProfile } = useUser()
 
   // 사용자 이름 가져오기
   useEffect(() => {
@@ -49,6 +51,18 @@ function Header() {
       fetchUserName()
     }
   }, [isAuthenticated])
+
+  // jobseekerProfile이 변경되면 헤더 이름을 즉시 동기화
+  useEffect(() => {
+    try {
+      if (jobseekerProfile && jobseekerProfile.name) {
+        setUserName(jobseekerProfile.name)
+        localStorage.setItem('userName', jobseekerProfile.name)
+      }
+    } catch (e) {
+      // ignore
+    }
+  }, [jobseekerProfile])
 
   const handleLogout = () => {
     logout()
