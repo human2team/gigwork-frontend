@@ -62,7 +62,8 @@ function EmployerLogin() {
             'Authorization': `Bearer ${response.accessToken}`
           }
         })
-        localStorage.setItem('userName', profileResponse.companyName)
+        const cleanName = String(profileResponse.companyName || '').replace(/[<>]+/g, '').trim()
+        if (cleanName) localStorage.setItem('userName', cleanName)
       } catch (profileError) {
         console.error('프로필 로딩 실패:', profileError)
         // 프로필 로딩 실패해도 로그인은 진행

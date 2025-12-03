@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { User, ArrowLeft, Eye, EyeOff } from 'lucide-react'
 import { apiCall, getErrorMessage } from '../utils/api'
+import EmailVerification from '../components/EmailVerification'
 
 function JobseekerSignup() {
   const navigate = useNavigate()
@@ -18,6 +19,8 @@ function JobseekerSignup() {
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isEmailVerified, setIsEmailVerified] = useState(false)
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null)
 
   useEffect(() => {
     // 팝업 창에서 보낸 메시지 수신
@@ -68,7 +71,12 @@ function JobseekerSignup() {
       return
     }
 
-    // 회원가입 API 호출
+    // 이메일 인증 확인
+    if (!isEmailVerified || verifiedEmail !== formData.email) {
+      alert('이메일 인증을 완료해주세요.')
+      return
+    }
+
     setIsSubmitting(true)
     try {
       const response = await apiCall<{
@@ -112,6 +120,11 @@ function JobseekerSignup() {
       ...formData,
       [e.target.name]: e.target.value
     })
+    // 이메일을 변경하면 인증 상태 초기화
+    if (e.target.name === 'email') {
+      setIsEmailVerified(false)
+      setVerifiedEmail(null)
+    }
   }
 
   return (
@@ -217,6 +230,14 @@ function JobseekerSignup() {
                 borderRadius: '6px',
                 fontSize: '16px'
               }}
+            />
+            {/* 이메일 인증 컴포넌트 */}
+            <EmailVerification 
+              email={formData.email} 
+              onVerified={(eml) => { 
+                setIsEmailVerified(true)
+                setVerifiedEmail(eml)
+              }} 
             />
           </div>
 

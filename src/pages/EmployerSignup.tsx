@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Briefcase, ArrowLeft, Eye, EyeOff, Building2 } from 'lucide-react'
+import { apiCall, getErrorMessage } from '../utils/api'
+import EmailVerification from '../components/EmailVerification'
 
 function EmployerSignup() {
   const navigate = useNavigate()
@@ -18,6 +20,9 @@ function EmployerSignup() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isEmailVerified, setIsEmailVerified] = useState(false)
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null)
 
   useEffect(() => {
     // 팝업 창에서 보낸 메시지 수신
@@ -68,12 +73,23 @@ function EmployerSignup() {
       return
     }
 
+    // 이메일 인증 확인
+    if (!isEmailVerified || verifiedEmail !== formData.email) {
+      alert('이메일 인증을 완료해주세요.')
+      return
+    }
+
+    setIsSubmitting(true)
     try {
-      // 백엔드 API 호출
-      const response = await fetch('/api/auth/signup/employer', {
+      const response = await apiCall<{
+        userId: number
+        email: string
+        userType: string
+        message: string
+      }>('/api/auth/signup/employer', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           email: formData.email,
@@ -86,18 +102,20 @@ function EmployerSignup() {
         })
       })
 
-      const data = await response.json()
-
-      if (response.ok) {
-        alert('회원가입이 완료되었습니다!')
-        navigate('/login/employer')
-      } else {
-        // 에러 메시지 표시
-        alert(data.message || '회원가입에 실패했습니다.')
-      }
+      console.log('회원가입 성공:', response)
+      
+      // userId를 localStorage에 저장
+      localStorage.setItem('userId', response.userId.toString())
+      localStorage.setItem('userEmail', response.email)
+      localStorage.setItem('userType', response.userType)
+      
+      alert(response.message || '회원가입이 완료되었습니다!')
+      navigate('/login/employer')
     } catch (error) {
-      console.error('회원가입 에러:', error)
-      alert('회원가입 중 오류가 발생했습니다. 다시 시도해주세요.')
+      console.error('회원가입 실패:', error)
+      alert(getErrorMessage(error))
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -106,6 +124,11 @@ function EmployerSignup() {
       ...formData,
       [e.target.name]: e.target.value
     })
+    // 이메일을 변경하면 인증 상태 초기화
+    if (e.target.name === 'email') {
+      setIsEmailVerified(false)
+      setVerifiedEmail(null)
+    }
   }
 
   return (
@@ -256,6 +279,14 @@ function EmployerSignup() {
                 borderRadius: '6px',
                 fontSize: '16px'
               }}
+            />
+            {/* 이메일 인증 컴포넌트 */}
+            <EmailVerification 
+              email={formData.email} 
+              onVerified={(eml) => { 
+                setIsEmailVerified(true)
+                setVerifiedEmail(eml)
+              }} 
             />
           </div>
 
@@ -450,20 +481,22 @@ function EmployerSignup() {
 
           <button
             type="submit"
+            disabled={isSubmitting}
             style={{
               width: '100%',
               padding: '12px',
-              backgroundColor: '#2196f3',
+              backgroundColor: isSubmitting ? '#90caf9' : '#2196f3',
               color: '#ffffff',
               border: 'none',
               borderRadius: '6px',
               fontSize: '16px',
               fontWeight: 'bold',
-              cursor: 'pointer',
-              marginBottom: '16px'
+              cursor: isSubmitting ? 'not-allowed' : 'pointer',
+              marginBottom: '16px',
+              opacity: isSubmitting ? 0.7 : 1
             }}
           >
-            회원가입
+            {isSubmitting ? '처리 중...' : '회원가입'}
           </button>
         </form>
 

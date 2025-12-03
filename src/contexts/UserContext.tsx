@@ -106,39 +106,11 @@ interface UserContextType {
 
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
-// 기본 구직자 프로필
-const defaultJobseekerProfile: JobseekerProfile = {
-  id: 2, // 실제 DB에 존재하는 구직자 id로 수정
-  name: '김민준',
-  email: 'minjun.kim@example.com',
-  phone: '010-1234-5678',
-  birthDate: '1995-05-15',
-  address: '서울시 강남구 테헤란로 123',
-  education: '대학(4년제)',
-  preferredRegion: '서울',
-  preferredDistrict: '강남구',
-  preferredDong: '역삼동',
-  workDuration: '1개월~3개월',
-  workDays: '월~금',
-  workTime: '오후 파트타임(12:00~18:00)',
-  strengths: ['빠른 학습능력', '책임감', '성실함'],
-  mbti: 'ENFP',
-  introduction: '안녕하세요. 성실하고 책임감 있는 자세로 일할 수 있는 구직자입니다.',
-  licenses: [
-    { id: 1, name: '운전면허증', issueDate: '2015-03-20', expiryDate: '2025-03-20' },
-    { id: 2, name: '포크레인 면허', issueDate: '2020-06-15', expiryDate: '2025-06-15' }
-  ],
-  experience: [
-    { id: 1, company: 'ABC 물류', position: '물류직원', duration: '2년', description: '창고 관리 및 물류 배송 업무' }
-  ],
-  physicalAttributes: {
-    muscleStrength: '중',
-    height: 175,
-    weight: 70
-  },
-  savedJobs: [],
-  appliedJobs: []
-}
+// NOTE: Removed hardcoded demo `defaultJobseekerProfile` to avoid leaking
+// test/demo data into production and to prevent automatic population of
+// jobseeker data for non-jobseeker sessions. If you need a dev/demo
+// profile in future, consider providing it behind a dev-only flag
+// (e.g. process.env.NODE_ENV === 'development' or a localStorage toggle).
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const [jobseekerProfile, setJobseekerProfile] = useState<JobseekerProfile | null>(null)
@@ -147,16 +119,27 @@ export function UserProvider({ children }: { children: ReactNode }) {
   // localStorage에서 프로필 불러오기
   useEffect(() => {
     const savedJobseeker = localStorage.getItem('jobseekerProfile')
+    const userType = localStorage.getItem('userType')
+
     if (savedJobseeker) {
-      try {
-        setJobseekerProfile(JSON.parse(savedJobseeker))
-      } catch (e) {
-        console.error('Failed to parse jobseeker profile:', e)
+      // If the stored profile exists but the current session is not a jobseeker,
+      // remove the stale profile to avoid showing jobseeker data for employers.
+      if (userType && userType.toUpperCase() !== 'JOBSEEKER') {
+        try {
+          localStorage.removeItem('jobseekerProfile')
+        } catch (e) {}
+        setJobseekerProfile(null)
+      } else {
+        try {
+          setJobseekerProfile(JSON.parse(savedJobseeker))
+        } catch (e) {
+          console.error('Failed to parse jobseeker profile:', e)
+          setJobseekerProfile(null)
+        }
       }
     } else {
-      // 기본 프로필 설정
-      setJobseekerProfile(defaultJobseekerProfile)
-      localStorage.setItem('jobseekerProfile', JSON.stringify(defaultJobseekerProfile))
+      // No saved profile: keep null. Do not auto-initialize demo data here.
+      setJobseekerProfile(null)
     }
 
     const savedEmployer = localStorage.getItem('employerProfile')
@@ -171,8 +154,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
   // 프로필 변경 시 localStorage에 저장
   useEffect(() => {
-    if (jobseekerProfile) {
+    const userType = localStorage.getItem('userType')
+    // Only persist jobseeker profile when the session is a jobseeker.
+    if (jobseekerProfile && userType && userType.toUpperCase() === 'JOBSEEKER') {
       localStorage.setItem('jobseekerProfile', JSON.stringify(jobseekerProfile))
+    } else {
+      // If not a jobseeker session or profile cleared, ensure no stale data remains.
+      try {
+        localStorage.removeItem('jobseekerProfile')
+      } catch (e) {}
     }
   }, [jobseekerProfile])
 

@@ -99,7 +99,41 @@ export function JobProvider({ children }: { children: ReactNode }) {
       console.log('📊 Number of jobs:', Array.isArray(data) ? data.length : 'not an array')
       
       if (Array.isArray(data)) {
-        setJobs(data)
+        // Map backend raw status + deadline to an effective status for UI.
+        const statusMap: { [key: string]: string } = {
+          'ACTIVE': '진행중',
+          'CLOSED': '마감',
+          'PENDING': '대기'
+        }
+
+        const isPastDeadline = (deadline?: string) => {
+          if (!deadline) return false
+          const d = new Date(deadline)
+          if (isNaN(d.getTime())) return false
+          const today = new Date()
+          d.setHours(0, 0, 0, 0)
+          today.setHours(0, 0, 0, 0)
+          return d.getTime() < today.getTime()
+        }
+
+        const transformed = data.map((job: any) => {
+          const rawStatus = job.status
+          let effectiveStatus = rawStatus
+          if (rawStatus === 'ACTIVE' && isPastDeadline(job.deadline)) {
+            effectiveStatus = 'CLOSED'
+          }
+
+          return {
+            ...job,
+            _rawStatus: rawStatus,
+            status: statusMap[effectiveStatus] || effectiveStatus,
+            views: job.views || 0,
+            applicants: job.applicants || 0,
+            postedDate: job.postedDate || job.posted || ''
+          }
+        })
+
+        setJobs(transformed)
         if (data.length === 0) {
           console.log('⚠️ Backend returned empty array - no jobs found for this employer')
         }
@@ -182,6 +216,7 @@ export function JobProvider({ children }: { children: ReactNode }) {
         '대기': ['대기']
       }
       const matchingStatuses = statusMap[statusFilter] || [statusFilter]
+      // job.status here is the UI-friendly (Korean) status after transformation
       if (!matchingStatuses.includes(job.status || '')) {
         return false
       }

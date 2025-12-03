@@ -36,13 +36,24 @@ function EmployerJobView() {
             'PENDING': '대기'
           }
           
+          // Determine effective status: if backend reports ACTIVE but
+          // the deadline has already passed, treat it as CLOSED for display.
+          const rawStatus = data.status
+          let effectiveStatus = rawStatus
+          if (rawStatus === 'ACTIVE' && isPastDeadline(data.deadline)) {
+            effectiveStatus = 'CLOSED'
+          }
+
           const transformedData = {
             ...data,
-            status: statusMap[data.status] || data.status,
+            // store original raw status for potential future updates
+            _rawStatus: rawStatus,
+            // use the effective status for UI (mapped to Korean label)
+            status: statusMap[effectiveStatus] || effectiveStatus,
             views: data.views || 0,
             applicants: data.applicants || 0
           }
-          
+
           setJob(transformedData)
         } else {
           console.error('❌ Failed to fetch job detail:', response.status)

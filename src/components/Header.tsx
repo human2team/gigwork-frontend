@@ -10,6 +10,7 @@ function Header() {
   const { isAuthenticated, logout } = useAuth()
   const [userName, setUserName] = useState('')
   const { jobseekerProfile } = useUser()
+  const [userType, setUserType] = useState<string | null>(null)
 
   // 사용자 이름 가져오기
   useEffect(() => {
@@ -56,13 +57,19 @@ function Header() {
   useEffect(() => {
     try {
       if (jobseekerProfile && jobseekerProfile.name) {
-        setUserName(jobseekerProfile.name)
-        localStorage.setItem('userName', jobseekerProfile.name)
+        const clean = String(jobseekerProfile.name).replace(/[<>]+/g, '').trim()
+        setUserName(clean)
+        localStorage.setItem('userName', clean)
       }
     } catch (e) {
       // ignore
     }
   }, [jobseekerProfile])
+
+  useEffect(() => {
+    const t = localStorage.getItem('userType')
+    setUserType(t)
+  }, [isAuthenticated])
 
   const handleLogout = () => {
     logout()
@@ -121,7 +128,7 @@ function Header() {
               fontWeight: '500'
             }}>
               <User size={16} />
-              <span>{userName}님</span>
+              <span>{userType === 'EMPLOYER' ? userName : `${userName}님`}</span>
             </div>
           )}
           <button

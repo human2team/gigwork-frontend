@@ -192,6 +192,12 @@ export async function apiCall<T>(
  */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof ApiException) {
+    // 백엔드에서 보낸 실제 에러 메시지가 있으면 우선 표시
+    if (error.message && error.message.trim() !== '') {
+      return error.message
+    }
+    
+    // 메시지가 없으면 상태 코드에 따른 기본 메시지
     if (error.status === 400) return '잘못된 요청입니다.'
     if (error.status === 401) return '인증이 필요합니다.'
     if (error.status === 403) return '권한이 없습니다.'
@@ -199,7 +205,7 @@ export function getErrorMessage(error: unknown): string {
     if (error.status === 408) return '요청 시간이 초과되었습니다.'
     if (error.status === 500) return '서버 오류가 발생했습니다.'
     if (error.status === 503) return '서비스를 일시적으로 사용할 수 없습니다.'
-    return error.message || '오류가 발생했습니다.'
+    return '오류가 발생했습니다.'
   }
 
   if (error instanceof Error) {

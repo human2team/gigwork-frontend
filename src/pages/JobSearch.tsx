@@ -336,6 +336,8 @@ function JobSearch() {
 
   // 필터링된 일자리
   const filteredJobs = jobs.filter(job => {
+    // 마감된 공고는 목록에서 제외
+    if (isJobClosed(job.status, job.deadline)) return false
     // 검색: 구직제목, 지역(근무지), 업직종 카테고리
     const q = searchQuery.trim().toLowerCase()
     const qDot = q.replace(/·/g, '.')
@@ -790,7 +792,13 @@ function JobSearch() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
                   <div style={{ fontSize: '13px', color: '#666' }}>{job.company}</div>
                   <button
-                    onClick={() => navigate(`/jobseeker/job/${job.id}`)}
+                    onClick={() => {
+                      if (isClosed) {
+                        alert('죄송합니다. 이 공고는 마감되었습니다.');
+                        return
+                      }
+                      navigate(`/jobseeker/job/${job.id}`)
+                    }}
                     style={{
                       border: 'none',
                       background: 'transparent',
@@ -799,7 +807,7 @@ function JobSearch() {
                       fontSize: '15px',
                       fontWeight: 700,
                       color: isClosed ? '#bdbdbd' : '#222',
-                      cursor: 'pointer',
+                      cursor: isClosed ? 'default' : 'pointer',
                       whiteSpace: 'nowrap',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis'
