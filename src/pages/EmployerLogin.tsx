@@ -19,6 +19,7 @@ function EmployerLogin() {
       const res = await fetch(createApiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // Cookie 저장을 위해 필수
         body: JSON.stringify({ email, password })
       })
       if (!res.ok) {
@@ -35,8 +36,6 @@ function EmployerLogin() {
         email: string
         userType: string
         message: string
-        accessToken: string
-        refreshToken: string
       }
 
       // userType 확인
@@ -45,9 +44,7 @@ function EmployerLogin() {
         return
       }
 
-      // JWT 토큰과 사용자 정보를 localStorage에 저장
-      localStorage.setItem('accessToken', response.accessToken)
-      localStorage.setItem('refreshToken', response.refreshToken)
+      // JWT 토큰은 Cookie에 자동 저장되므로 사용자 정보만 localStorage에 저장
       localStorage.setItem('userId', response.userId.toString())
       localStorage.setItem('userEmail', response.email)
       localStorage.setItem('userType', response.userType)
@@ -57,10 +54,7 @@ function EmployerLogin() {
         const profileResponse = await apiCall<{
           companyName: string
         }>(`/api/employer/profile/${response.userId}`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${response.accessToken}`
-          }
+          method: 'GET'
         })
         const cleanName = String(profileResponse.companyName || '').replace(/[<>]+/g, '').trim()
         if (cleanName) localStorage.setItem('userName', cleanName)

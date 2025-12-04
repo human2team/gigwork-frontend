@@ -4,9 +4,16 @@
  * API 기본 URL 가져오기
  * 환경 변수에서 VITE_API_BASE_URL을 읽거나 기본값 사용
  */
+// export function getApiBaseUrl(): string {
+//   const envValue = import.meta.env.VITE_API_BASE_URL
+//   const baseUrl = (envValue && envValue.trim() !== '') ? envValue.trim() : 'http://localhost:8080'
+//   return baseUrl
+// }
 export function getApiBaseUrl(): string {
-  const envValue = import.meta.env.VITE_API_BASE_URL
-  const baseUrl = (envValue && envValue.trim() !== '') ? envValue.trim() : 'http://localhost:8080'
+  //const envValue = import.meta.env.VITE_API_BASE_URL
+  //const baseUrl = (envValue && envValue.trim() !== '') ? envValue.trim() : 'http://localhost:8080'
+  //현재 npm run build 방식으로 말아서 spring으로 바로 넣기 때문에 .env 또는 위 방식이 아닌 아래 방식으로 처리
+  const baseUrl = (location.href.startsWith('http://localhost')) ? 'http://localhost:8080' : 'https://gigwork.cloud'
   return baseUrl
 }
 
@@ -59,7 +66,7 @@ export class ApiException extends Error implements ApiError {
 /**
  * API 호출 래퍼 함수
  * 에러 처리 및 타임아웃 지원
- * JWT 인증 자동 처리
+ * JWT 인증 자동 처리 (Cookie 기반)
  */
 export async function apiCall<T>(
   url: string,
@@ -71,25 +78,18 @@ export async function apiCall<T>(
 
   // 환경 변수에서 API URL 가져오기
   const apiUrl = createApiUrl(url)
-
-  // localStorage에서 Access Token 가져오기
-  const accessToken = localStorage.getItem('accessToken')
   
   // 기본 헤더 설정
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...((options.headers as HeadersInit) || {})
   }
-  
-  // 토큰이 있으면 Authorization 헤더 추가
-  if (accessToken) {
-    headers['Authorization'] = `Bearer ${accessToken}`
-  }
 
   try {
     const response = await fetch(apiUrl, {
       ...options,
       headers,
+      credentials: 'include', // Cookie 전송을 위해 필수
       signal: controller.signal
     })
 
@@ -100,18 +100,14 @@ export async function apiCall<T>(
       console.warn('[JWT 인증 오류] 401 Unauthorized 발생:', apiUrl)
       
       // Refresh Token으로 재시도
-      const newToken = await refreshAccessToken()
-      if (newToken) {
+      const refreshed = await refreshAccessToken()
+      if (refreshed) {
         console.log('[JWT 인증] Refresh Token으로 재시도 성공')
-        // 새 토큰으로 재시도
-        const retryHeaders = {
-          ...headers,
-          'Authorization': `Bearer ${newToken}`
-        }
-        
+        // 새 토큰은 이미 Cookie에 설정되어 있으므로 바로 재시도
         const retryResponse = await fetch(apiUrl, {
           ...options,
-          headers: retryHeaders,
+          headers,
+          credentials: 'include',
           signal: controller.signal
         })
         
@@ -121,20 +117,28 @@ export async function apiCall<T>(
             return await retryResponse.json()
           }
           return await retryResponse.text() as unknown as T
+        } else {
+          console.error('[JWT 인증] 재시도도 실패:', retryResponse.status)
+          // 재시도도 실패하면 에러 반환 (로그아웃 처리하지 않음)
+          throw new ApiException(
+            `재시도 실패: HTTP ${retryResponse.status}`,
+            retryResponse.status,
+            retryResponse.statusText
+          )
         }
+      } else {
+        // Refresh Token도 실패하면 사용자에게 알림 후 로그아웃
+        console.error('[JWT 인증 실패] 세션이 만료되었습니다. 로그인 페이지로 이동합니다.')
+        
+        // 사용자에게 알림
+        alert('⚠️ 세션이 만료되었습니다.\n다시 로그인해주세요.')
+        
+        // 로그아웃 처리 (Cookie는 서버에서 자동 삭제)
+        localStorage.clear()
+        window.location.href = '/jobseeker/login'
+        
+        throw new ApiException('세션이 만료되었습니다. 다시 로그인해주세요.', 401, 'Unauthorized')
       }
-      
-      // Refresh Token도 실패하면 사용자에게 알림 후 로그아웃
-      console.error('[JWT 인증 실패] 세션이 만료되었습니다. 로그인 페이지로 이동합니다.')
-      
-      // 사용자에게 알림
-      alert('⚠️ 세션이 만료되었습니다.\n다시 로그인해주세요.')
-      
-      // 로그아웃 처리
-      localStorage.clear()
-      window.location.href = '/jobseeker/login'
-      
-      throw new ApiException('세션이 만료되었습니다. 다시 로그인해주세요.', 401, 'Unauthorized')
     }
 
     if (!response.ok) {
@@ -251,51 +255,74 @@ export function safeLocalStorageRemove(key: string): boolean {
 
 /**
  * Access Token 갱신 함수
- * Refresh Token을 사용하여 새로운 Access Token 발급
+ * Refresh Token Cookie를 사용하여 새로운 Access Token 발급
+ * 동시 요청 방지를 위한 Promise 캐싱 적용
  */
-async function refreshAccessToken(): Promise<string | null> {
-  const refreshToken = localStorage.getItem('refreshToken')
-  if (!refreshToken) {
-    console.warn('[JWT 인증] Refresh Token이 없습니다.')
-    return null
+let refreshTokenPromise: Promise<boolean> | null = null
+
+async function refreshAccessToken(): Promise<boolean> {
+  // 이미 refresh 진행 중이면 기존 Promise 재사용
+  if (refreshTokenPromise) {
+    console.log('[JWT 인증] 이미 진행 중인 refresh 요청이 있습니다. 대기 중...')
+    return refreshTokenPromise
   }
   
-  try {
-    console.log('[JWT 인증] Refresh Token으로 Access Token 갱신 시도...')
-    const apiUrl = createApiUrl('/api/auth/refresh')
-    const response = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ refreshToken })
-    })
-    
-    if (!response.ok) {
-      console.error('[JWT 인증] Token 갱신 실패:', response.status, response.statusText)
+  // 새 refresh 요청 시작
+  refreshTokenPromise = (async () => {
+    try {
+      console.log('[JWT 인증] Refresh Token으로 Access Token 갱신 시도...')
       
-      // 403 Forbidden 또는 401 Unauthorized - Refresh Token도 만료됨
-      if (response.status === 401 || response.status === 403) {
-        alert('⚠️ 로그인 세션이 완전히 만료되었습니다.\n다시 로그인해주세요.')
+      // 현재 쿠키 확인 (디버깅용)
+      console.log('[JWT 인증] 현재 쿠키:', document.cookie)
+      
+      const apiUrl = createApiUrl('/api/auth/refresh')
+      console.log('[JWT 인증] 갱신 API URL:', apiUrl)
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include' // Cookie의 refreshToken 전송
+      })
+      
+      console.log('[JWT 인증] 갱신 응답 상태:', response.status, response.statusText)
+      
+      if (!response.ok) {
+        const errorBody = await response.text()
+        console.error('[JWT 인증] Token 갱신 실패:', response.status, response.statusText, 'Body:', errorBody)
+        
+        // 디버깅: 에러 정보 출력 (자동 로그아웃 하지 않음)
+        if (response.status === 401 || response.status === 403) {
+          console.error('[JWT 인증 실패 상세]', {
+            status: response.status,
+            statusText: response.statusText,
+            errorBody: errorBody,
+            currentCookies: document.cookie
+          })
+          // 개발 중에는 자동 로그아웃 비활성화
+          // alert('⚠️ 로그인 세션이 만료되었습니다.\n다시 로그인해주세요.')
+          // localStorage.clear()
+          // window.location.href = '/jobseeker/login'
+        }
+        
+        return false
       }
       
-      return null
+      const responseBody = await response.text()
+      console.log('[JWT 인증] Access Token 갱신 성공 (Cookie에 자동 저장됨). Response:', responseBody)
+      
+      // 새 토큰은 Cookie에 자동으로 설정되므로 별도 저장 불필요
+      return true
+    } catch (error) {
+      console.error('[JWT 인증] 토큰 갱신 중 오류 발생:', error)
+      return false
+    } finally {
+      // refresh 완료 후 Promise 초기화 (다음 refresh 허용)
+      refreshTokenPromise = null
     }
-    
-    const data = await response.json()
-    
-    console.log('[JWT 인증] Access Token 갱신 성공')
-    
-    // 새 토큰 저장
-    localStorage.setItem('accessToken', data.accessToken)
-    if (data.refreshToken) {
-      localStorage.setItem('refreshToken', data.refreshToken)
-    }
-    
-    return data.accessToken
-  } catch (error) {
-    console.error('[JWT 인증] 토큰 갱신 중 오류 발생:', error)
-    return null
-  }
+  })()
+  
+  return refreshTokenPromise
 }
 
