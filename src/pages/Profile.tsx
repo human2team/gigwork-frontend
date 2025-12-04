@@ -1149,9 +1149,9 @@ function Profile() {
     { id: 'licenses' as ProfileTab, label: '자격증', icon: Award },
     { id: 'experience' as ProfileTab, label: '경력', icon: Briefcase },
     { id: 'physical' as ProfileTab, label: '신체 속성', icon: Activity },
-    { id: 'saved' as ProfileTab, label: '저장된 일자리', icon: Bookmark },
-    { id: 'applied' as ProfileTab, label: '지원한 일자리', icon: CheckCircle },
-    { id: 'proposals' as ProfileTab, label: '제안받은 일자리', icon: MessageSquare }
+    { id: 'saved' as ProfileTab, label: '관심 공고', icon: Bookmark },
+    { id: 'applied' as ProfileTab, label: '지원 현황', icon: CheckCircle },
+    { id: 'proposals' as ProfileTab, label: '제안 목록', icon: MessageSquare }
   ]
 
   return (
@@ -2852,7 +2852,7 @@ function Profile() {
 
       {activeTab === 'saved' && (
         <div>
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>저장된 일자리</h2>
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>관심 공고</h2>
           <p style={{ color: '#666', marginBottom: '24px' }}>
             관심 있는 일자리를 저장하여 나중에 쉽게 확인할 수 있습니다.
           </p>
@@ -3017,7 +3017,7 @@ function Profile() {
 
       {activeTab === 'applied' && (
         <div>
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>지원한 일자리</h2>
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>지원 현황</h2>
           <p style={{ color: '#666', marginBottom: '24px' }}>
             지원을 완료한 일자리 목록입니다. 지원 상태를 확인하고 관리할 수 있습니다.
           </p>
