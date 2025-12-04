@@ -198,7 +198,10 @@ export default function JobseekerProposals() {
 
   return (
     <div style={{ marginTop: 32, position: 'relative' }}>
-      <h2 style={{ fontSize: '22px', fontWeight: 'bold', marginBottom: 16 }}>제안받은 일자리</h2>
+      <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '12px' }}>제안 목록</h2>
+      <p style={{ color: '#666', marginBottom: '24px' }}>
+        사업자가 보낸 채용 제안 목록입니다. 제안을 확인하여 수락하거나 거절할 수 있습니다.
+      </p>
       {loading && <div>로딩 중...</div>}
       {error && <div style={{ color: 'red' }}>에러: {error}</div>}
       {!loading && !error && proposals.length === 0 && (
