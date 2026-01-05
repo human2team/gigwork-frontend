@@ -1,0 +1,1 @@
+xcopy dist c:\src\git\gigwork\gigwork-backend\src\main\resources\public /E /I /Y
