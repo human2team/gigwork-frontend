@@ -13,7 +13,7 @@ export function getApiBaseUrl(): string {
   //const envValue = import.meta.env.VITE_API_BASE_URL
   //const baseUrl = (envValue && envValue.trim() !== '') ? envValue.trim() : 'http://localhost:8080'
   //현재 npm run build 방식으로 말아서 spring으로 바로 넣기 때문에 .env 또는 위 방식이 아닌 아래 방식으로 처리
-  const baseUrl = (location.href.startsWith('http://localhost')) ? 'http://localhost:8080' : 'https://gigwork.cloud'
+  const baseUrl = (location.href.startsWith('http://localhost')) ? 'http://localhost:8080' : 'https://albahero.com:546'
   return baseUrl
 }
 
